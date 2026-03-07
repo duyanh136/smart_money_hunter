@@ -3,6 +3,7 @@ flask-cors
 flask-socketio
 pandas
 yfinance
+multitasking==0.0.11
 requests
 websocket-client
 pandas-ta
