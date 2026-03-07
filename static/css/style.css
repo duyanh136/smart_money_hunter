@@ -34,19 +34,22 @@ body {
     font-family: var(--font-family);
     background-color: var(--bg-dark);
     color: var(--text-primary);
-    overflow: hidden;
+    overflow-x: hidden;
+    /* Only hide horizontal overflow */
+    overflow-y: auto;
+    /* Allow vertical scroll */
     line-height: 1.5;
 }
 
 /* Layout Grid */
 .container {
     padding: 16px 24px;
-    height: 100vh;
+    min-height: 100vh;
+    /* Changed from height to min-height */
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     max-width: 100%;
-    /* Use full width instead of 1920px max */
     margin: 0 auto;
 }
 
@@ -93,10 +96,10 @@ header h1 {
 .dashboard-grid {
     display: grid;
     grid-template-columns: 280px 1fr 320px;
-    /* Slimmer sidebars, more room for chart */
     gap: 20px;
     flex: 1;
-    overflow: hidden;
+    overflow: visible;
+    /* Allow overflow */
     min-height: 0;
 }
 
@@ -106,9 +109,11 @@ header h1 {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    overflow-y: auto;
-    padding-right: 4px;
-    /* Space for scrollbar */
+    height: auto;
+    /* Let it grow naturally */
+    overflow-y: visible;
+    /* Changed from auto */
+    padding-right: 0px;
 }
 
 .main-panel {
@@ -116,8 +121,9 @@ header h1 {
     flex-direction: column;
     gap: 20px;
     min-width: 0;
-    overflow: hidden;
-    min-height: 0;
+    overflow: visible;
+    /* Changed from hidden */
+    height: auto;
 }
 
 /* Cards - Smooth Styling */
@@ -442,8 +448,11 @@ button {
     }
 
     .scanner-table-container {
-        height: 400px;
-        /* Reduced fixed height */
+        height: auto;
+        /* Allow full table height on mobile */
+        max-height: 500px;
+        /* Add max height so it's not endlessly long but scrolls within */
+        overflow-y: auto;
     }
 }
 
@@ -454,14 +463,29 @@ button {
         gap: 16px;
     }
 
+    .search-box {
+        width: 100%;
+    }
+
     .search-box input {
         width: 100%;
+        box-sizing: border-box;
     }
 
     #price-chart {
         height: 350px !important;
     }
 
+    .weather-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .weather-banner>div:last-child {
+        width: 100%;
+        justify-content: space-between;
+    }
 }
 
 /* --- Top 5 Leaders Dashboard --- */
