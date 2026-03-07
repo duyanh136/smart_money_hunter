@@ -1,0 +1,440 @@
+[
+  {
+    "action": "Đứng Ngoài",
+    "price": 2790.0,
+    "signal": "Bình thường",
+    "symbol": "ABS"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 16400.0,
+    "signal": "Bình thường",
+    "symbol": "AGR"
+  },
+  {
+    "action": "BÁN / CHỐT LỜI",
+    "price": 26500.0,
+    "signal": "Bình thường",
+    "symbol": "ANV"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 6000.0,
+    "signal": "Bình thường",
+    "symbol": "ASM"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 63300.0,
+    "signal": "Bình thường",
+    "symbol": "BCM"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 46900.0,
+    "signal": "Bình thường",
+    "symbol": "BID"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 38000.0,
+    "signal": "Bình thường",
+    "symbol": "BSI"
+  },
+  {
+    "action": "BÁN / CHỐT LỜI",
+    "price": 24500.0,
+    "signal": "Bình thường",
+    "symbol": "BSR"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 17900.0,
+    "signal": "Bình thường",
+    "symbol": "CII"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 25500.0,
+    "signal": "Bình thường",
+    "symbol": "CNG"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 7800.0,
+    "signal": "Bình thường",
+    "symbol": "CRE"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 29000.0,
+    "signal": "Bình thường",
+    "symbol": "CSV"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 30800.0,
+    "signal": "Bình thường",
+    "symbol": "CTS"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 160.34,
+    "signal": "Bình thường",
+    "symbol": "DASH"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 26700.0,
+    "signal": "Bình thường",
+    "symbol": "DBC"
+  },
+  {
+    "action": "Nắm Giữ",
+    "price": 39200.0,
+    "signal": "Bình thường",
+    "symbol": "DCM"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 68400.0,
+    "signal": "Bình thường",
+    "symbol": "DGC"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 15850.0,
+    "signal": "Bình thường",
+    "symbol": "DIG"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 15750.0,
+    "signal": "Bình thường",
+    "symbol": "DXG"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 23100.0,
+    "signal": "Bình thường",
+    "symbol": "EIB"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 13600.0,
+    "signal": "Bình thường",
+    "symbol": "FCN"
+  },
+  {
+    "action": "BÁN / CHỐT LỜI",
+    "price": 96300.0,
+    "signal": "Bình thường",
+    "symbol": "FPT"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 32800.0,
+    "signal": "Bình thường",
+    "symbol": "FTS"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 101600.0,
+    "signal": "Bình thường",
+    "symbol": "GAS"
+  },
+  {
+    "action": "Nắm Giữ",
+    "price": 75000.0,
+    "signal": "Bình thường",
+    "symbol": "GMD"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 36400.0,
+    "signal": "Bình thường",
+    "symbol": "GVR"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 16600.0,
+    "signal": "Bình thường",
+    "symbol": "HAG"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 12150.0,
+    "signal": "Bình thường",
+    "symbol": "HHV"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 5000.0,
+    "signal": "Bình thường",
+    "symbol": "HID"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 2780.0,
+    "signal": "Bình thường",
+    "symbol": "HQC"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 15500.0,
+    "signal": "Bình thường",
+    "symbol": "HSG"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 53.87,
+    "signal": "Bình thường",
+    "symbol": "HUT"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 6840.0,
+    "signal": "Bình thường",
+    "symbol": "IDI"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 34150.0,
+    "signal": "Bình thường",
+    "symbol": "KBC"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 28300.0,
+    "signal": "Bình thường",
+    "symbol": "KDH"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 6580.0,
+    "signal": "Bình thường",
+    "symbol": "KHG"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 10150.0,
+    "signal": "Bình thường",
+    "symbol": "LCG"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 3850.0,
+    "signal": "Bình thường",
+    "symbol": "LDG"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 42050.0,
+    "signal": "Bình thường",
+    "symbol": "LPB"
+  },
+  {
+    "action": "Nắm Giữ",
+    "price": 28300.0,
+    "signal": "Bình thường",
+    "symbol": "MBB"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 78000.0,
+    "signal": "Bình thường",
+    "symbol": "MSN"
+  },
+  {
+    "action": "Nắm Giữ",
+    "price": 92800.0,
+    "signal": "Bình thường",
+    "symbol": "MWG"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 14050.0,
+    "signal": "Bình thường",
+    "symbol": "NAB"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 29000.0,
+    "signal": "Bình thường",
+    "symbol": "NLG"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 12650.0,
+    "signal": "Bình thường",
+    "symbol": "NVL"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 13300.0,
+    "signal": "Bình thường",
+    "symbol": "ORS"
+  },
+  {
+    "action": "Nắm Giữ",
+    "price": 31600.0,
+    "signal": "Bình thường",
+    "symbol": "PAN"
+  },
+  {
+    "action": "Nắm Giữ",
+    "price": 26250.0,
+    "signal": "Bình thường",
+    "symbol": "PC1"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 17400.0,
+    "signal": "Bình thường",
+    "symbol": "PDR"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 52000.0,
+    "signal": "Bình thường",
+    "symbol": "PLX"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 0.25,
+    "signal": "Bình thường",
+    "symbol": "POM"
+  },
+  {
+    "action": "BÁN / CHỐT LỜI",
+    "price": 13400.0,
+    "signal": "Bình thường",
+    "symbol": "POW"
+  },
+  {
+    "action": "BÁN / CHỐT LỜI",
+    "price": 34150.0,
+    "signal": "Bình thường",
+    "symbol": "PVD"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 20050.0,
+    "signal": "Bình thường",
+    "symbol": "PVT"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 48500.0,
+    "signal": "Bình thường",
+    "symbol": "SAB"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 6890.0,
+    "signal": "Bình thường",
+    "symbol": "SCR"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 15450.0,
+    "signal": "Bình thường",
+    "symbol": "SHB"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 12350.0,
+    "signal": "Bình thường",
+    "symbol": "SMC"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 16650.0,
+    "signal": "Bình thường",
+    "symbol": "TCH"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 4940.0,
+    "signal": "Bình thường",
+    "symbol": "TLH"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 17500.0,
+    "signal": "Bình thường",
+    "symbol": "TPB"
+  },
+  {
+    "action": "Giữ/Chốt Dần (Không Mua)",
+    "price": 42.0,
+    "signal": "Bình thường",
+    "symbol": "TR"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 64400.0,
+    "signal": "Bình thường",
+    "symbol": "VCB"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 18900.0,
+    "signal": "Bình thường",
+    "symbol": "VCG"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 60100.0,
+    "signal": "Bình thường",
+    "symbol": "VHC"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 109000.0,
+    "signal": "Bình thường",
+    "symbol": "VHM"
+  },
+  {
+    "action": "BÁN / CHỐT LỜI",
+    "price": 17250.0,
+    "signal": "Bình thường",
+    "symbol": "VIB"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 160000.0,
+    "signal": "Bình thường",
+    "symbol": "VIC"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 22550.0,
+    "signal": "Bình thường",
+    "symbol": "VIX"
+  },
+  {
+    "action": "BÁN / CHỐT LỜI",
+    "price": 169200.0,
+    "signal": "Bình thường",
+    "symbol": "VJC"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 18600.0,
+    "signal": "Bình thường",
+    "symbol": "VND"
+  },
+  {
+    "action": "Quan Sát",
+    "price": 28300.0,
+    "signal": "Bình thường",
+    "symbol": "VPB"
+  },
+  {
+    "action": "Đứng Ngoài",
+    "price": 29800.0,
+    "signal": "Bình thường",
+    "symbol": "VRE"
+  }
+]

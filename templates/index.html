@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Money Hunter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.3">
+    <script src="{{ url_for('static', filename='js/vendor/lightweight-charts.standalone.production.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/vendor/socket.io.min.js') }}"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Inline styles for new features (Move to css/style.css later if needed) */
+        .weather-banner {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #fff;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .weather-sunny {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #333;
+        }
+
+        .weather-rainy {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .weather-storm {
+            background: linear-gradient(135deg, #434343 0%, #000000 100%);
+            color: #ff6b6b;
+        }
+
+        .strategy-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            border-left: 3px solid #2196F3;
+        }
+
+        .strategy-title {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+
+        .strategy-content {
+            font-size: 0.95em;
+            color: #fff;
+        }
+
+        .highlight-text {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .warning-text {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        .macro-info {
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>THỢ SĂN TIỀN THÔNG MINH</h1>
+            <div class="search-box">
+                <input type="text" id="symbol-input" list="stock-suggestions" placeholder="Nhập mã (VD: VND, SSI...)"
+                    value="VND">
+                <datalist id="stock-suggestions"></datalist>
+            </div>
+        </header>
+
+        <!-- Market Weather Banner -->
+        <div id="weather-banner" class="weather-banner weather-rainy">
+            <div>
+                <div style="font-size: 1.2em; margin-bottom: 5px;">Thời tiết: <span id="weather-status">Mưa Rào</span>
+                </div>
+                <div class="macro-info" id="weather-macro">Lãi suất: --</div>
+            </div>
+            <div style="text-align: right; display: flex; gap: 15px; align-items: center;">
+                <div>
+                    <div style="font-size: 0.9em; opacity: 0.9;">Hành động chung</div>
+                    <div id="weather-action" style="font-size: 1.1em;">Quan Sát</div>
+                </div>
+                <!-- Nút Stop Loss TCBS -->
+                <button class="btn-primary"
+                    style="background-color: #d29922; border-color: #d29922; color: #fff; width: auto; font-size: 13px;"
+                    onclick="document.getElementById('sl-modal').style.display='flex'">Cập nhật Stop-loss TCBS</button>
+            </div>
+        </div>
+
+        <!-- Stop Loss Modal -->
+        <div id="sl-modal"
+            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;">
+            <div
+                style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; width: 85%; max-width: 900px; padding: 20px; display: flex; flex-direction: column; gap: 15px; max-height: 90vh;">
+                <h2 style="margin: 0; color: #f9c513; display:flex; justify-content: space-between;">
+                    Công Cụ Tính Toán Trailing Stop (TCBS)
+                    <button onclick="document.getElementById('sl-modal').style.display='none'"
+                        style="background:none; border:none; color:#fff; font-size: 18px; cursor: pointer;">✕</button>
+                </h2>
+
+                <p style="font-size: 0.85em; color: var(--text-secondary); margin: 0;">Nhập thông tin vị thế. Hệ thống
+                    sẽ áp dụng Bảo Vệ Lợi Nhuận theo Smart Sell Radar (Phân kỳ MACD, Gãy nền, Lỏng lẻo, Lái xả...)</p>
+
+                <div style="display: flex; gap: 8px; font-size: 0.9em;">
+                    <input type="text" id="sl-input-symbol" placeholder="Mã CK"
+                        style="padding: 6px; border-radius: 4px; border: 1px solid #444; background: #000; color: #fff; width: 80px;">
+                    <input type="number" id="sl-input-cost" placeholder="Giá mua"
+                        style="padding: 6px; border-radius: 4px; border: 1px solid #444; background: #000; color: #fff; width: 90px;"
+                        step="0.01">
+                    <input type="number" id="sl-input-vol" placeholder="Khối lượng"
+                        style="padding: 6px; border-radius: 4px; border: 1px solid #444; background: #000; color: #fff; width: 90px;">
+                    <button class="btn-primary" style="width: auto; padding: 6px 10px;"
+                        onclick="addStopLossItem()">Thêm</button>
+                    <button class="btn-primary" style="width: auto; background: #238636; padding: 6px 10px;"
+                        onclick="processStopLoss()">⚙️ TÍNH TOÁN</button>
+                </div>
+
+                <div
+                    style="overflow-y: auto; flex: 1; min-height: 300px; border: 1px solid var(--border-color); border-radius: 4px;">
+                    <table id="sl-table" style="width: 100%; text-align: right;">
+                        <thead style="background: rgba(255,255,255,0.05); font-size: 0.85em;">
+                            <tr>
+                                <th style="text-align: left;">Mã</th>
+                                <th>Giá Vốn</th>
+                                <th>Giá Hiện Tại</th>
+                                <th>% Lợi Nhuận</th>
+                                <th style="color: #f9c513;">SMART SELL RADAR</th>
+                                <th>Hành động TCBS</th>
+                                <th>Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Dữ liệu render bằng Js -->
+                            <tr>
+                                <td colspan="8" style="text-align:center; padding: 20px;">Chưa có dữ liệu. Hãy thêm mã
+                                    cổ phiếu.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="psy-banner"
+            style="display: none; padding: 10px; margin-bottom: 20px; text-align: center; border-radius: 5px;">
+            <h3 id="psy-text" style="margin: 0;"></h3>
+        </div>
+
+        <!-- Top 5 Leaders Dashboard -->
+        <div class="top-leaders-container" id="top-leaders-container" style="display: none;">
+            <div class="leaders-header">
+                <h2>🏆 BẢNG VÀNG: TOP 5 LÊN TÀU</h2>
+                <span class="leaders-subtitle">Máy quét Tự động - Cập nhật hàng ngày</span>
+            </div>
+            <div class="leaders-grid" id="leaders-grid">
+                <!-- Vị trí chèn Cổ Phiếu bằng JS -->
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="left-panel">
+                <div class="card info-card">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <h2 id="stock-symbol" style="margin: 0;">VND</h2>
+                        <span id="stock-group"
+                            style="background: #333; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">--</span>
+                    </div>
+
+                    <h1 id="current-price" style="margin: 10px 0;">--</h1>
+
+                    <div id="volume-info" style="font-size: 0.9em; color: #8b949e; margin-bottom: 10px;">
+                        Vol: <span id="current-vol" style="color: #f0f6fc; font-weight: bold;">--</span>
+                    </div>
+
+                    <div class="strategy-box">
+                        <div class="strategy-title">CHIẾN LƯỢC GỢI Ý</div>
+                        <div id="strategy-text" class="strategy-content">--</div>
+                    </div>
+                </div>
+
+                <div class="card phase-card" id="phase-card">
+                    <h3>Giai đoạn cổ phiếu</h3>
+                    <p id="phase-value">N/A</p>
+                    <div id="action-value" style="margin-top: 5px; font-weight: bold; color: #4CAF50;">--</div>
+                </div>
+
+                <div class="card signals-card">
+                    <h3>Tín hiệu Kỹ thuật</h3>
+                    <div id="sig-voteo" class="signal-item">
+                        <span>Vô Teo (Cạn cung)</span>
+                        <span class="status">--</span>
+                    </div>
+                    <div id="sig-buydip" class="signal-item">
+                        <span>Mua Dip (MA20)</span>
+                        <span class="status">--</span>
+                    </div>
+                    <div id="sig-breakout" class="signal-item">
+                        <span>Đột phá (Breakout)</span>
+                        <span class="status">--</span>
+                    </div>
+                    <div id="sig-squeeze" class="signal-item">
+                        <span>BB Squeeze (Nén)</span>
+                        <span class="status">--</span>
+                    </div>
+                    <div id="sig-super" class="signal-item">
+                        <span>Lái Gom (Super)</span>
+                        <span class="status">--</span>
+                    </div>
+                    <div class="separator" style="margin: 10px 0; border-top: 1px solid #444;"></div>
+                    <div id="sig-distribution" class="signal-item">
+                        <span>Phân phối (Đỉnh)</span>
+                        <span class="status">--</span>
+                    </div>
+                    <div id="sig-upbo" class="signal-item">
+                        <span>Bẫy (Up Bô)</span>
+                        <span class="status">--</span>
+                    </div>
+                    <div id="sig-loose" class="signal-item">
+                        <span>Biến động lỏng</span>
+                        <span class="status">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-panel">
+                <div class="time-frames">
+                    <button class="tf-btn active" onclick="changePeriod('1y')">1 năm</button>
+                    <button class="tf-btn" onclick="changePeriod('6mo')">6 tháng</button>
+                    <button class="tf-btn" onclick="changePeriod('3mo')">3M</button>
+                </div>
+                <div id="price-chart" class="chart-container" style="height: 400px;"></div>
+                <div id="rsi-chart" class="chart-container" style="height: 120px; margin-top: 10px;"></div>
+                <div id="macd-chart" class="chart-container" style="height: 150px; margin-top: 10px;"></div>
+                <div id="flow-chart" class="chart-container" style="height: 250px; margin-top: 10px;"></div>
+            </div>
+
+            <div class="right-panel">
+                <div class="card scanner-card">
+                    <h3>Máy quét (Real-time)</h3>
+                    <div class="scanner-controls">
+                        <button class="btn-primary" onclick="runScan()">Quét ngay</button>
+                    </div>
+                    <div class="scanner-filters">
+                        <div class="filter-group">
+                            <button class="btn-filter" onclick="filterByAction('Mua')">Điểm Mua 🔵</button>
+                            <button class="btn-filter" onclick="filterByAction('Bán')">Điểm Bán 🔴</button>
+                            <button class="btn-filter" id="btn-radar-filter" onclick="filterByRadar()"
+                                style="border-color: #f9c513; color: #f9c513;">Radar Bán 📡</button>
+                            <button class="btn-filter" onclick="filterByAction('')" style="border-color: #30363d;">Tất
+                                cả</button>
+                        </div>
+                        <button class="filter-btn" onclick="filterByAction('Quan Sát')">View</button>
+                        <button class="filter-btn" onclick="filterByAction('sell')">Bán</button>
+                    </div>
+                    <div class="scanner-table-container">
+                        <table id="scanner-table">
+                            <thead>
+                                <tr>
+                                    <th>Mã</th>
+                                    <th>Giá (%)</th>
+                                    <th>Tín hiệu</th>
+                                    <th>Hành động</th>
+                                    <th>Xem</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Market Health Removed as per user request -->
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=1.3"></script>
+</body>
+
+</html>

@@ -1,0 +1,11 @@
+flask
+flask-cors
+flask-socketio
+pandas
+yfinance
+requests
+websocket-client
+pandas-ta
+numpy
+python-dotenv
+schedule
