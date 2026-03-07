@@ -1,5 +1,10 @@
 import sys
 import io
+import os
+
+# Set Numba cache dir to /tmp for Vercel Serverless read-only filesystem compatibility
+os.environ["NUMBA_CACHE_DIR"] = "/tmp"
+
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 if sys.stderr.encoding != 'utf-8':
