@@ -6,6 +6,6 @@ yfinance
 requests
 websocket-client
 pandas-ta
-numpy
+numpy<2.0.0
 python-dotenv
 schedule
