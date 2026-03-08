@@ -1,5 +1,8 @@
 // Main JS
-const socket = io();
+const socket = io({
+    transports: ['websocket', 'polling'],
+    upgrade: true
+});
 let priceChart, flowChart, rsiChart, macdChart;
 let candleSeries, pocSeries, sharkSeries, retailSeries;
 let rsiSeries, macdLineSeries, macdSignalSeries, macdHistSeries, ma20Series, ma50Series;
