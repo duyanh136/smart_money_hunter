@@ -10,3 +10,5 @@ pandas-ta
 numpy
 python-dotenv
 schedule
+pymssql
+pyodbc
