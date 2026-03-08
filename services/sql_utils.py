@@ -10,16 +10,46 @@ logger = logging.getLogger(__name__)
 class SQLUtils:
     @staticmethod
     def get_connection():
+        # Vercel / Serverless Environment detect
+        is_serverless = os.getenv('VERCEL') or os.getenv('AWS_LAMBDA_FUNCTION_NAME')
+        
         try:
-            conn_str = (
-                f"DRIVER={os.getenv('SQL_DRIVER', '{ODBC Driver 17 for SQL Server}')};"
-                f"SERVER={os.getenv('SQL_SERVER')};"
-                f"DATABASE={os.getenv('SQL_DATABASE')};"
-                f"UID={os.getenv('SQL_USER')};"
-                f"PWD={os.getenv('SQL_PASSWORD')};"
-                "TrustServerCertificate=yes;"
-            )
-            return pyodbc.connect(conn_str, timeout=5)
+            if is_serverless:
+                # Use pymssql for serverless (No ODBC driver required)
+                import pymssql
+                return pymssql.connect(
+                    server=os.getenv('SQL_SERVER'),
+                    user=os.getenv('SQL_USER'),
+                    password=os.getenv('SQL_PASSWORD'),
+                    database=os.getenv('SQL_DATABASE'),
+                    timeout=5,
+                    login_timeout=5,
+                    autocommit=True
+                )
+            else:
+                # Local development - prefer pyodbc if driver exists
+                try:
+                    conn_str = (
+                        f"DRIVER={os.getenv('SQL_DRIVER', '{ODBC Driver 17 for SQL Server}')};"
+                        f"SERVER={os.getenv('SQL_SERVER')};"
+                        f"DATABASE={os.getenv('SQL_DATABASE')};"
+                        f"UID={os.getenv('SQL_USER')};"
+                        f"PWD={os.getenv('SQL_PASSWORD')};"
+                        "TrustServerCertificate=yes;"
+                    )
+                    return pyodbc.connect(conn_str, timeout=5)
+                except Exception as pyodbc_err:
+                    logger.warning(f"pyodbc failed, falling back to pymssql: {pyodbc_err}")
+                    import pymssql
+                    # pymssql server format can be server\instance or server:port
+                    server = os.getenv('SQL_SERVER')
+                    return pymssql.connect(
+                        server=server,
+                        user=os.getenv('SQL_USER'),
+                        password=os.getenv('SQL_PASSWORD'),
+                        database=os.getenv('SQL_DATABASE'),
+                        autocommit=True
+                    )
         except Exception as e:
             logger.error(f"SQL Connection Error: {e}")
             return None

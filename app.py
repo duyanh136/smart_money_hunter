@@ -31,7 +31,15 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'smart-money-hunter-secret'
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
+# Vercel detection
+IS_VERCEL = os.getenv('VERCEL') == '1'
+
+# For Vercel, we must use polling as WebSocket isn't sustained in serverless
+if IS_VERCEL:
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', transports=['polling'])
+else:
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 @app.route('/')
 def index():
@@ -396,48 +404,49 @@ def scan_market():
 if __name__ == '__main__':
     logger.info("Starting Smart Money Hunter (Flask)...")
     
-    # Start Telegram Bot Scheduler in background
-    logger.info("Starting Telegram Bot thread...")
-    bot_thread = threading.Thread(target=run_bot_scheduler, daemon=True)
-    bot_thread.start()
-    
-    # Start TCBS Stream if token available
-    if tcbs_service.token:
-        try:
-            logger.info("Initializing TCBS WebSocket...")
-            tcbs_stream.token = tcbs_service.token
-            
-            # Link to SocketIO
-            def on_price_update(symbol, data):
-                price = data.get('matchPrice') or data.get('price') or data.get('refPrice')
-                vol = data.get('matchVolume') or data.get('accumulatedVolume')
+    # ONLY Start background threads if NOT on Vercel
+    if not IS_VERCEL:
+        # Start Telegram Bot Scheduler in background
+        logger.info("Starting Telegram Bot thread (Local Mode)...")
+        bot_thread = threading.Thread(target=run_bot_scheduler, daemon=True)
+        bot_thread.start()
+        
+        # Start TCBS Stream if token available
+        if tcbs_service.token:
+            try:
+                logger.info("Initializing TCBS WebSocket (Local Mode)...")
+                tcbs_stream.token = tcbs_service.token
                 
-                # Ensure price scaling (TCBS raw data is sometimes unscaled)
-                real_price = price / 1000 if price and price > 1000 else price
+                # Link to SocketIO
+                def on_price_update(symbol, data):
+                    price = data.get('matchPrice') or data.get('price') or data.get('refPrice')
+                    vol = data.get('matchVolume') or data.get('accumulatedVolume')
+                    real_price = price / 1000 if price and price > 1000 else price
+                    
+                    if real_price:
+                        check_realtime_stoploss(symbol, real_price)
+                    
+                    socketio.emit('price_update', {
+                        'symbol': symbol,
+                        'price': price,
+                        'vol': vol,
+                        'raw': data
+                    })
                 
-                # Check real-time stop loss push alert
-                if real_price:
-                    check_realtime_stoploss(symbol, real_price)
+                tcbs_stream.on_update_callback = on_price_update
+                tcbs_stream.start()
                 
-                socketio.emit('price_update', {
-                    'symbol': symbol,
-                    'price': price,
-                    'vol': vol,
-                    'raw': data
-                })
-            
-            tcbs_stream.on_update_callback = on_price_update
-            tcbs_stream.start()
-            
-            # Sub watchlist + Portfolio symbols
-            portfolio = load_portfolio()
-            portfolio_symbols = [item['symbol'].strip().upper() for item in portfolio if item.get('symbol')]
-            combined_watchlist = list(set(WATCHLIST + portfolio_symbols))
-            
-            time.sleep(1)
-            tcbs_stream.subscribe(combined_watchlist)
-        except Exception as e:
-            logger.error(f"Failed to start TCBS Stream: {e}")
+                # Sub watchlist + Portfolio symbols
+                portfolio = load_portfolio()
+                portfolio_symbols = [item['symbol'].strip().upper() for item in portfolio if item.get('symbol')]
+                combined_watchlist = list(set(WATCHLIST + portfolio_symbols))
+                
+                time.sleep(1)
+                tcbs_stream.subscribe(combined_watchlist)
+            except Exception as e:
+                logger.error(f"Failed to start TCBS Stream: {e}")
+    else:
+        logger.info("Vercel Mode: Background threads disabled. Using SQL Sync fallback.")
 
     @socketio.on('connect')
     def handle_connect():
