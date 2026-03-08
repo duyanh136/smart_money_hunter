@@ -119,6 +119,27 @@ def check_realtime_stoploss(symbol: str, current_price: float):
         except Exception as e:
             logger.error(f"Error sending emergency alert: {e}")
 
+def send_system_alert(message: str):
+    """Sends a system/maintenance alert to Telegram"""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    
+    if not bot_token or not chat_id:
+        logger.warning(f"System Alert (Dry Run): {message}")
+        return
+
+    formatted_msg = f"🛠 <b>HỆ THỐNG THÔNG BÁO</b>\n\n{message}"
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": formatted_msg,
+        "parse_mode": "HTML"
+    }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        logger.error(f"Failed to send system alert: {e}")
+
 def load_portfolio():
     if not os.path.exists(PORTFOLIO_FILE):
         return []

@@ -71,11 +71,22 @@ class MarketService:
 
     @staticmethod
     def get_latest_price(symbol: str) -> float:
-        # 1. Try Socket Realtime
+        # 1. Try Socket Realtime (Local Collector Mode)
         p = tcbs_stream.get_price(symbol)
         if p: return p
             
-        # 2. Fallback to History
+        # 2. Try SQL Server (Vercel / Remote Mode)
+        # If we are on Vercel or the local socket isn't running, check the DB
+        import os
+        from services.sql_utils import SQLUtils
+        
+        # Check if we are running in a cloud/serverless environment or socket is down
+        if os.getenv("VERCEL") or not tcbs_stream.running:
+            db_price = SQLUtils.get_price(symbol)
+            if db_price:
+                return db_price
+
+        # 3. Fallback to History
         df = MarketService.get_history(symbol, period="5d")
         if df is not None and not df.empty:
             return df['Close'].iloc[-1]

@@ -4,7 +4,9 @@ import time
 import json
 import logging
 import base64
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+import queue
+from services.sql_utils import SQLUtils
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,16 @@ class TCBSStreamService:
         self.subscribed_topics = set()
         self.lock = threading.Lock()
         self.on_update_callback = None # Callback function(symbol, data)
+        
+        # SQL Sync Queue
+        self.sql_queue = queue.Queue()
+        self.sql_worker_thread = None
+
+        # Safeguard & Alerts
+        self.retry_count = 0
+        self.max_retries = 3
+        self.last_alert_time = 0
+        self.alert_cooldown = 1800 # 30 minutes
 
     def start(self):
         if not self.token:
@@ -40,15 +52,51 @@ class TCBSStreamService:
         
         # Start Heartbeat Thread
         threading.Thread(target=self._heartbeat_loop, daemon=True).start()
+        
+        # Start SQL Worker Thread
+        if not self.sql_worker_thread or not self.sql_worker_thread.is_alive():
+            self.sql_worker_thread = threading.Thread(target=self._sql_worker_loop, daemon=True)
+            self.sql_worker_thread.start()
+
+    def _sql_worker_loop(self):
+        """Background worker to batch SQL updates and avoid thread explosion"""
+        logger.info("TCBSStream: SQL Worker Started.")
+        batch = {} # symbol -> {price, volume}
+        last_sync = time.time()
+        
+        while self.running:
+            try:
+                # Wait for data with timeout to allow periodic batch commits
+                try:
+                    symbol, price, volume = self.sql_queue.get(timeout=1.0)
+                    batch[symbol] = {'price': price, 'volume': volume}
+                except queue.Empty:
+                    pass
+                
+                # Sync to DB every 2 seconds if there's data
+                if (time.time() - last_sync > 2.0) and batch:
+                    for sym, vals in batch.items():
+                        SQLUtils.upsert_price(sym, vals['price'], vals['volume'])
+                    batch.clear()
+                    last_sync = time.time()
+                    
+            except Exception as e:
+                logger.error(f"SQL Worker Error: {e}")
+                time.sleep(1)
 
     def _heartbeat_loop(self):
         while self.running:
             time.sleep(2)
-            if self.ws and self.ws.sock and self.ws.sock.connected:
+            if self.ws and getattr(self.ws, 'sock', None) and self.ws.sock.connected:
                 try:
                     self.ws.send("d|p|||") # Ping
                 except:
                     pass
+
+    def stop(self):
+        self.running = False
+        if self.ws:
+            self.ws.close()
 
     def on_open(self, ws):
         logger.info("TCBSStream: Connected.")
@@ -58,6 +106,14 @@ class TCBSStreamService:
         auth_msg = f"d|a|||{encoded_token}"
         ws.send(auth_msg)
         logger.info("TCBSStream: Sent Auth.")
+
+        if self.subscribed_topics:
+            topics = list(self.subscribed_topics)
+            logger.info(f"TCBSStream: Auto-resubscribing to {len(topics)} topics...")
+            def delayed_sub():
+                time.sleep(1)
+                self.subscribe(topics)
+            threading.Thread(target=delayed_sub, daemon=True).start()
 
     def on_message(self, ws, message):
         try:
@@ -77,49 +133,95 @@ class TCBSStreamService:
             if msg_type == 'd':
                 # System message
                 # check auth success: d|0|{"success":true...}
-                pass
+                try:
+                    data = json.loads(payload)
+                    if data.get('success') is False:
+                        reason = data.get('message', 'Unknown reason')
+                        logger.error(f"TCBSStream: Auth Failed! {reason}")
+                        self._handle_fatal_error(f"Xác thực thất bại: {reason}")
+                    elif data.get('success') is True:
+                        logger.info("TCBSStream: Auth Success.")
+                        self.retry_count = 0 # Reset on successful auth
+                except:
+                    pass
                 
             elif msg_type == 's':
                 # Data message
                 # s|1|{...} (Bid), s|2| (Offer), s|4| (Base), s|5| (Match), s|6| (TickerMatch)
-                # Parse JSON
                 try:
                     data = json.loads(payload)
                     symbol = data.get('symbol', '').upper()
-                    if not symbol: return
-                    
-                    with self.lock:
+                    if symbol:
                         if symbol not in self.latest_data:
                             self.latest_data[symbol] = {}
                         
                         # Merge data
                         self.latest_data[symbol].update(data)
+
+                        # Queue for SQL Sync
+                        # Prioritize matchPrice, fallback to current price or reference price
+                        price = data.get('matchPrice') or data.get('price') or data.get('refPrice')
+                        vol = data.get('matchVolume') or data.get('accumulatedVolume') or 0
+                        if price:
+                            # Normalize price (TCBS often sends in 1000s, but not always)
+                            real_price = price / 1000 if price > 1000 else price
+                            self.sql_queue.put((symbol, real_price, vol))
                         
                         # Notify external callback
                         if self.on_update_callback:
                             self.on_update_callback(symbol, self.latest_data[symbol])
-                        
                 except json.JSONDecodeError:
-                    pass
-
+                    pass # Silently ignore non-JSON 's' messages if any
         except Exception as e:
-            logger.error(f"Stream Parse Error: {e}")
+            logger.error(f"TCBSStream: Error parsing message - {e}")
 
     def on_error(self, ws, error):
         logger.error(f"TCBSStream Error: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
         logger.info("TCBSStream: Closed.")
-        # Reconnect logic could go here
+        was_running = self.running
+        self.running = False
+        if was_running:
+            self.retry_count += 1
+            if self.retry_count >= self.max_retries:
+                logger.error(f"TCBSStream: Max retries ({self.max_retries}) reached. Stopping.")
+                self._handle_fatal_error(f"Kết nối thất bại {self.max_retries} lần liên tiếp. Dừng để bảo vệ IP.")
+                return
+
+            logger.info(f"TCBSStream: Reconnect attempt {self.retry_count}/{self.max_retries} in 10 seconds...")
+            def reconnect():
+                time.sleep(10)
+                from services.tcbs_service import tcbs_service
+                # Ensure we have the latest token
+                self.token = tcbs_service.token
+                self.start()
+            threading.Thread(target=reconnect, daemon=True).start()
+
+    def _handle_fatal_error(self, message: str):
+        """Stops the service and sends a Telegram alert with cooldown"""
+        self.running = False
+        if self.ws:
+            self.ws.close()
+        
+        now = time.time()
+        if now - self.last_alert_time > self.alert_cooldown:
+            from services.telegram_bot import send_system_alert
+            alert_text = (
+                f"⚠️ <b>TCBS Connection Error</b>\n"
+                f"Lý do: {message}\n\n"
+                f"💡 <b>Hành động:</b> Vui lòng kiểm tra lại Token hoặc lấy Token mới bằng file <code>Update_TCBS_Token.bat</code>."
+            )
+            send_system_alert(alert_text)
+            self.last_alert_time = now
         
     def subscribe(self, symbols: list):
-        if not self.ws or not self.ws.sock or not self.ws.sock.connected:
+        if not self.ws or getattr(self.ws, 'sock', None) is None or not getattr(self.ws.sock, 'connected', False):
             return
             
         # Filter symbols
         unique_syms = set(s.upper() for s in symbols)
-        # Check against already subscribed? No, just resubscribe is fine or diff
-        # Spec: d|s|tk|bp+bi+tm+mp+op+fe|MX1,MX2
+        self.subscribed_topics.update(unique_syms)
         
         # Chunking: URL/Message limit? Let's do 20 at a time
         chunk = []
