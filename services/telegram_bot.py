@@ -5,6 +5,7 @@ import requests
 import schedule
 import time
 import math
+import threading
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
@@ -360,30 +361,49 @@ def check_portfolio_and_send_alert():
         logger.error(f"Error sending Telegram message: {e}")
 
 def auto_save_daily_leaders():
-    """Fetches Top 10 leaders and saves them to SQL History."""
-    logger.info("Executing daily 16:00 Top 10 Leader Scan and Save...")
+    """Fetches Top 10 leaders and saves them to SQL History at 16:00 every day."""
+    logger.info("Executing daily 16:00 Market Analysis History Backup...")
     try:
-        leaders = MarketService.get_top_leaders(limit=10)
-        if leaders:
-            SQLUtils.save_top_leaders_history(leaders)
-            logger.info("Successfully saved daily leaders to SQL.")
-            
-        # Also run the FULL market scan for all stocks
-        logger.info("Executing comprehensive full market scan...")
-        MarketService.run_full_market_scan()
-        logger.info("Successfully finished full market scan and saved to SQL.")
+        # 1. Run the FULL market scan for all stocks and SAVE TO HISTORY
+        logger.info("Executing comprehensive full market scan with History Backup...")
+        results = MarketService.run_full_market_scan(save_history=True)
         
-        # Optional: Send a summary to Telegram
-        if leaders:
-            bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-            chat_id = os.getenv("TELEGRAM_CHAT_ID")
-            if bot_token and chat_id:
-                leader_names = ", ".join([l['symbol'] for l in leaders])
-                msg = f"🏆 <b>TOP 10 LÊN TÀU (DAILY SCAN)</b>\n\nDanh sách: {leader_names}\n\n<i>Dữ liệu đã được lưu trữ vào SQL Server để tra cứu lịch sử.</i>"
-                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                requests.post(url, json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}, timeout=5)
+        # 2. Extract Top 10 leaders from the results (they are already ranked)
+        leaders = [r for r in results if r.get('rank') is not None and r.get('rank') <= 10]
+        leaders.sort(key=lambda x: x.get('rank', 99))
+        
+        logger.info(f"Successfully finished full market scan. Saved {len(results)} symbols to history.")
+        
+        # 3. Send a detailed summary to Telegram
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        
+        if bot_token and chat_id:
+            if leaders:
+                leader_lines = []
+                for l in leaders:
+                    shark = "💎" if l.get('is_shark_dominated') else ""
+                    storm = "🛡️" if l.get('is_storm_resistant') else ""
+                    line = f"#{l['rank']} <b>{l['symbol']}</b> (P: {l['price']:.1f}, {l['change']:+.1f}%) {shark}{storm}"
+                    leader_lines.append(line)
+                
+                leader_list_str = "\n".join(leader_lines)
+                msg = (
+                    f"📊 <b>BÁO CÁO KẾT PHIÊN {datetime.now().strftime('%d/%m/%Y')}</b>\n\n"
+                    f"✅ Đã lưu trữ dữ liệu phân tích của {len(results)} mã vào SQL Server.\n\n"
+                    f"🏆 <b>TOP 10 CỔ PHIẾU MẠNH NHẤT:</b>\n"
+                    f"{leader_list_str}\n\n"
+                    f"<i>Sau này bạn có thể truy vấn bảng MarketAnalysisHistory để xem lại.</i>"
+                )
+            else:
+                msg = f"📊 <b>BÁO CÁO KẾT PHIÊN {datetime.now().strftime('%d/%m/%Y')}</b>\n\n✅ Đã hoàn thành sao lưu dữ liệu toàn thị trường vào SQL Server."
+                
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            requests.post(url, json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}, timeout=10)
+            
     except Exception as e:
         logger.error(f"Error in auto_save_daily_leaders: {e}")
+        send_system_alert(f"Lỗi khi lưu dữ liệu lịch sử lúc 16:00: {e}")
 
 def run_bot_scheduler():
     logger.info("Initializing Telegram Bot Scheduler & Cache...")

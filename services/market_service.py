@@ -3,6 +3,7 @@ import pandas as pd
 import logging
 from typing import Optional, Dict, Any
 import time
+from datetime import datetime
 
 from services.tcbs_service import tcbs_service
 from services.tcbs_socket import tcbs_stream
@@ -313,10 +314,10 @@ class MarketService:
         return final_leaders
 
     @staticmethod
-    def run_full_market_scan():
+    def run_full_market_scan(save_history: bool = False) -> list:
         """
-        Scans all major stocks and saves pre-computed analysis to SQL Server.
-        This allows the web UI to load nearly instantly.
+        Scans all liquid symbols and saves analysis to SQL.
+        If save_history is True, also saves a snapshot to MarketAnalysisHistory.
         """
         from services.symbol_loader import SymbolLoader
         from services.smart_money import SmartMoneyAnalyzer
@@ -325,45 +326,50 @@ class MarketService:
         
         # Get all liquid stocks
         universe = SymbolLoader.get_liquid_stocks()
+        if not universe:
+            logger.error("Empty symbol universe for full scan.")
+            return []
+
         logger.info(f"Starting full market scan for {len(universe)} symbols...")
-        
-        # Get proxy for Index Correlation
-        idx_df = MarketService.get_history("SSI", period="3mo")
-        
         results = []
+        
+        # Reference index data for Relative Strength (RS)
+        index_df = MarketService.get_history('^VNINDEX', period='1mo')
+        if index_df is None or index_df.empty:
+            logger.warning("Could not fetch ^VNINDEX, falling back to SSI as market proxy.")
+            index_df = MarketService.get_history('SSI', period='1mo')
         
         def analyze_sym(symbol):
             try:
-                df = MarketService.get_history(symbol, period="6mo")
+                # Use a slightly longer period for full scan metrics
+                df = MarketService.get_history(symbol, period='6mo')
                 if df is not None and not df.empty:
                     df = SmartMoneyAnalyzer.analyze(df)
                     if df is not None and not df.empty:
-                        last_row = df.iloc[-1]
-                        score_data = SmartMoneyAnalyzer.calc_leader_score(df, index_df=idx_df)
-                        
+                        score_data = SmartMoneyAnalyzer.calc_leader_score(df, index_df)
                         return {
                             'symbol': symbol,
-                            'price': last_row['Close'],
-                            'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2),
-                            'vol_ratio': round(last_row.get('Vol_Ratio', 0), 2),
-                            'rsi': round(last_row.get('RSI', 50), 1),
-                            'market_phase': df['Market_Phase'].iloc[-1],
-                            'action': df['Action_Recommendation'].iloc[-1],
-                            'signal_voteo': bool(last_row.get('Signal_VoTeo')),
-                            'signal_buydip': bool(last_row.get('Signal_BuyDip')),
-                            'signal_super': bool(last_row.get('Signal_Super')),
-                            'signal_breakout': bool(last_row.get('Signal_Breakout')),
-                            'signal_squeeze': bool(last_row.get('Signal_Squeeze')),
-                            'signal_distribution': bool(last_row.get('Signal_Distribution')),
-                            'signal_upbo': bool(last_row.get('Signal_Upbo')),
-                            'signal_goldensell': bool(last_row.get('Signal_GoldenSell')),
-                            'signal_bigmoney': bool(last_row.get('Signal_BigMoney')),
-                            'radar_panicsell': bool(last_row.get('Signal_PanicSell')),
-                            'radar_phankyam': bool(last_row.get('Signal_PhanKyAmMACD')),
-                            'radar_sangtay': bool(last_row.get('Signal_SangTayNhoLe')),
-                            'radar_daodong': bool(last_row.get('Signal_DaoDongLongLeo')),
-                            'radar_gaynen': bool(last_row.get('Signal_GayNenTestLai')),
-                            'radar_chammay': bool(last_row.get('Signal_ChamMayKenhDuoi')),
+                            'price': df['Close'].iloc[-1],
+                            'change': df['Change_Pct'].iloc[-1] if 'Change_Pct' in df else 0,
+                            'vol_ratio': df['Vol_Ratio'].iloc[-1] if 'Vol_Ratio' in df else 1,
+                            'rsi': df['RSI'].iloc[-1] if 'RSI' in df else 50,
+                            'market_phase': df['Market_Phase'].iloc[-1] if 'Market_Phase' in df else 'Stable',
+                            'action': df['Action_Rec'].iloc[-1] if 'Action_Rec' in df else 'Hold',
+                            'signal_voteo': bool(df['Signal_VoTeo'].iloc[-1]) if 'Signal_VoTeo' in df else False,
+                            'signal_buydip': bool(df['Signal_BuyDip'].iloc[-1]) if 'Signal_BuyDip' in df else False,
+                            'signal_super': bool(df['Signal_Super'].iloc[-1]) if 'Signal_Super' in df else False,
+                            'signal_breakout': bool(df['Signal_Breakout'].iloc[-1]) if 'Signal_Breakout' in df else False,
+                            'signal_squeeze': bool(df['Signal_Squeeze'].iloc[-1]) if 'Signal_Squeeze' in df else False,
+                            'signal_distribution': bool(df['Signal_Distribution'].iloc[-1]) if 'Signal_Distribution' in df else False,
+                            'signal_upbo': bool(df['Signal_UpBo'].iloc[-1]) if 'Signal_UpBo' in df else False,
+                            'signal_goldensell': bool(df['Signal_GoldenSell'].iloc[-1]) if 'Signal_GoldenSell' in df else False,
+                            'signal_bigmoney': bool(df['Signal_BigMoney'].iloc[-1]) if 'Signal_BigMoney' in df else False,
+                            'radar_panicsell': bool(df['Signal_PanicSell'].iloc[-1]) if 'Signal_PanicSell' in df else False,
+                            'radar_phankyam': bool(df['Signal_PhanKyAmMACD'].iloc[-1]) if 'Signal_PhanKyAmMACD' in df else False,
+                            'radar_sangtay': bool(df['Signal_SangTayNhoLe'].iloc[-1]) if 'Signal_SangTayNhoLe' in df else False,
+                            'radar_daodong': bool(df['Signal_DaoDongLongLeo'].iloc[-1]) if 'Signal_DaoDongLongLeo' in df else False,
+                            'radar_gaynen': bool(df['Signal_GayNenTestLai'].iloc[-1]) if 'Signal_GayNenTestLai' in df else False,
+                            'radar_chammay': bool(df['Signal_ChamMayKenhDuoi'].iloc[-1]) if 'Signal_ChamMayKenhDuoi' in df else False,
                             'pyramid_action': SmartMoneyAnalyzer.get_pyramid_sizing(df),
                             'base_distance_pct': df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0,
                             'score': score_data.get('score', 0),
@@ -380,13 +386,6 @@ class MarketService:
             for future in concurrent.futures.as_completed(future_to_symbol):
                 res = future.result()
                 if res:
-                    # Additional call to get the Vietnamese signal status
-                    try:
-                        # We need the dataframe again or we should have returned it from analyze_sym
-                        # Let's optimize: analyze_sym already has the df.
-                        # I'll update analyze_sym to include buy_signal_status
-                        pass
-                    except: pass
                     results.append(res)
 
         # Ranking logic: Sort by score descending
@@ -397,5 +396,9 @@ class MarketService:
         # Save to database
         if results:
             SQLUtils.save_market_analysis(results)
-            logger.info(f"Full market scan complete. Saved {len(results)} results with rankings.")
+            if save_history:
+                today = datetime.now().date().strftime('%Y-%m-%d')
+                SQLUtils.save_market_analysis_to_history(results, today)
+                logger.info(f"Saved full market analysis history for {today}")
+            logger.info(f"Full market scan complete. Saved {len(results)} results.")
         return results

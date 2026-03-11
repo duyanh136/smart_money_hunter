@@ -327,6 +327,57 @@ class SQLUtils:
             conn.close()
 
     @staticmethod
+    def save_market_analysis_to_history(analysis_data: List[Dict[str, Any]], date_str: str):
+        """Saves a snapshot of market analysis to the history table for a specific date."""
+        conn = SQLUtils.get_connection()
+        if not conn: return
+        
+        p = SQLUtils._get_placeholder(conn)
+        sql_insert = f"""
+            INSERT INTO MarketAnalysisHistory (
+                Symbol, AnalysisDate, Price, ChangePct, VolRatio, RSI, MarketPhase, ActionRecommendation,
+                LeaderScore, Rank, BuySignalStatus, IsSharkDominated, IsStormResistant,
+                SignalVoTeo, SignalBuyDip, SignalSuper, SignalBreakout, SignalSqueeze,
+                SignalDistribution, SignalUpbo, SignalGoldenSell, SignalBigMoney,
+                RadarPanicSell, RadarPhanKyAm, RadarSangTay, RadarDaoDong, 
+                RadarGayNen, RadarChamMay, CreatedAt
+            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, GETDATE())
+        """
+        
+        try:
+            cursor = conn.cursor()
+            for row in analysis_data:
+                sym = row.get('symbol', '').upper()
+                if not sym: continue
+                
+                # Check for existing record for this sym/date to avoid PK violation
+                cursor.execute(f"DELETE FROM MarketAnalysisHistory WHERE Symbol = {p} AND AnalysisDate = {p}", (sym, date_str))
+                
+                vals = (
+                    sym, date_str,
+                    row.get('price', 0), row.get('change', 0), row.get('vol_ratio', 0), row.get('rsi', 0),
+                    row.get('market_phase', ''), row.get('action', ''),
+                    row.get('score', 0), row.get('rank'), row.get('buy_signal_status', 'QUAN SÁT'),
+                    row.get('is_shark_dominated', False), row.get('is_storm_resistant', False),
+                    row.get('signal_voteo', False), row.get('signal_buydip', False), row.get('signal_super', False),
+                    row.get('signal_breakout', False), row.get('signal_squeeze', False),
+                    row.get('signal_distribution', False), row.get('signal_upbo', False),
+                    row.get('signal_goldensell', False), row.get('signal_bigmoney', False),
+                    row.get('radar_panicsell', False), row.get('radar_phankyam', False),
+                    row.get('radar_sangtay', False), row.get('radar_daodong', False),
+                    row.get('radar_gaynen', False), row.get('radar_chammay', False)
+                )
+                cursor.execute(sql_insert, vals)
+            
+            if not getattr(conn, 'autocommit', False):
+                conn.commit()
+            logger.info(f"Market analysis history saved for {date_str}")
+        except Exception as e:
+            logger.error(f"Error saving market analysis history: {e}")
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_all_market_analysis() -> List[Dict[str, Any]]:
         """Retrieves all market analysis results from the database."""
         results = []
