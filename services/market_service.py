@@ -231,36 +231,6 @@ class MarketService:
                 "class": "weather-rainy"
             }
 
-    @staticmethod
-    def get_top_leaders(limit: int = 5) -> list:
-        # 1. Check if we already have today's leaders saved in SQL (Historical refined)
-        today = datetime.now().date().strftime('%Y-%m-%d')
-        cached_leaders = SQLUtils.get_top_leaders_history(today)
-        if cached_leaders and len(cached_leaders) >= limit:
-            logger.info("Returning refined top leaders from SQL.")
-            return cached_leaders[:limit]
-            
-        # 2. Try the broader MarketAnalysis cache (Pre-computed)
-        logger.info("Checking MarketAnalysis cache for leaders...")
-        all_analysis = SQLUtils.get_all_market_analysis()
-        if all_analysis:
-            # Sort by LeaderScore descending
-            sorted_leaders = sorted(all_analysis, key=lambda x: x.get('LeaderScore', 0), reverse=True)
-            if sorted_leaders:
-                # Map MarketAnalysis fields to TopLeaders format
-                mapped_leaders = []
-                for l in sorted_leaders[:limit]:
-                    mapped_leaders.append({
-                        'symbol': l['Symbol'],
-                        'price': l['Price'],
-                        'change': l['ChangePct'],
-                        'score': l.get('LeaderScore', 0),
-                        'is_shark_dominated': l.get('IsSharkDominated', False),
-                        'is_storm_resistant': l.get('IsStormResistant', False),
-                        'tag': l.get('ActionRecommendation', 'Theo dõi')
-                    })
-                logger.info(f"Returning {len(mapped_leaders)} leaders from MarketAnalysis cache.")
-                return mapped_leaders
 
         # 3. Fallback to real-time scan (Last resort, slow)
         logger.warning("No cache found for leaders. Falling back to real-time scan...")
@@ -396,12 +366,12 @@ class MarketService:
         for i, res in enumerate(results):
             res['rank'] = i + 1 if i < 10 else None # Only rank top 10
             
-        # Save to database
-        if results:
+        # Save to database ONLY if requested (e.g., at 16:00)
+        if results and save_history:
+            # We use save_history as the trigger to also update the 'last known' state
             SQLUtils.save_market_analysis(results)
-            if save_history:
-                today = datetime.now().date().strftime('%Y-%m-%d')
-                SQLUtils.save_market_analysis_to_history(results, today)
-                logger.info(f"Saved full market analysis history for {today}")
-            logger.info(f"Full market scan complete. Saved {len(results)} results.")
+            today = datetime.now().date().strftime('%Y-%m-%d')
+            SQLUtils.save_market_analysis_to_history(results, today)
+            logger.info(f"Saved full market analysis & history for {today}")
+        
         return results

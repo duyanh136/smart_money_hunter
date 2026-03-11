@@ -325,52 +325,57 @@ def stoploss_tool():
                 
     return jsonify({"status": "success", "data": results})
 
-@app.route('/api/scan')
+@app.route('/api/scan', methods=['GET'])
+@cross_origin()
 def scan_market():
     """
-    Returns pre-computed analysis from SQL Server MarketAnalysis table.
-    Very fast, loads results from the background worker.
+    Scans market in real-time. 
+    User requested to stop using DB for the live dashboard.
     """
     try:
-        results = SQLUtils.get_all_market_analysis()
+        logger.info("API: /api/scan - Performing real-time scan...")
+        # Direct real-time scan, no SQL saving
+        results = MarketService.run_full_market_scan(save_history=False)
         
-        # Map SQL column names to frontend expected names
+        if not results:
+            # Fallback to last known SQL state if real-time fails
+            logger.warning("API: Real-time scan failed, falling back to SQL.")
+            results = SQLUtils.get_all_market_analysis()
+
+        # Map results to frontend format
         mapped_results = []
         for r in results:
+            # Handle both dict formats (Code vs SQL)
             mapped_results.append({
-                'symbol': r['Symbol'],
-                'price': r['Price'],
-                'change': r['ChangePct'],
-                'vol_ratio': r['VolRatio'],
-                'rsi': r['RSI'],
-                'market_phase': r['MarketPhase'],
-                'action': r['ActionRecommendation'],
-                'signal_voteo': bool(r['SignalVoTeo']),
-                'signal_buydip': bool(r['SignalBuyDip']),
-                'signal_super': bool(r['SignalSuper']),
-                'signal_breakout': bool(r['SignalBreakout']),
-                'signal_squeeze': bool(r['SignalSqueeze']),
-                'signal_distribution': bool(r['SignalDistribution']),
-                'signal_upbo': bool(r['SignalUpbo']),
-                'signal_goldensell': bool(r.get('SignalGoldenSell', False)),
-                'signal_bigmoney': bool(r.get('SignalBigMoney', False)),
-                'radar_panicsell': bool(r['RadarPanicSell']),
-                'radar_phankyam': bool(r['RadarPhanKyAm']),
-                'radar_sangtay': bool(r['RadarSangTay']),
-                'radar_daodong': bool(r['RadarDaoDong']),
-                'radar_gaynen': bool(r['RadarGayNen']),
-                'radar_chammay': bool(r['RadarChamMay']),
-                'pyramid_action': r['PyramidAction'],
-                'base_distance_pct': r['BaseDistancePct'],
-                'is_shark_dominated': bool(r.get('IsSharkDominated', False)),
-                'is_storm_resistant': bool(r.get('IsStormResistant', False)),
-                'rank': r.get('Rank'),
-                'buy_signal_status': r.get('BuySignalStatus', 'N/A')
+                'symbol': r.get('symbol') or r.get('Symbol'),
+                'price': r.get('price') or r.get('Price'),
+                'change': r.get('change') or r.get('ChangePct'),
+                'vol_ratio': r.get('vol_ratio') or r.get('VolRatio'),
+                'rsi': r.get('rsi') or r.get('RSI'),
+                'market_phase': r.get('market_phase') or r.get('MarketPhase'),
+                'action': r.get('action') or r.get('ActionRecommendation'),
+                'signal_voteo': bool(r.get('signal_voteo') or r.get('SignalVoTeo')),
+                'signal_buydip': bool(r.get('signal_buydip') or r.get('SignalBuyDip')),
+                'signal_super': bool(r.get('signal_super') or r.get('SignalSuper')),
+                'signal_breakout': bool(r.get('signal_breakout') or r.get('SignalBreakout')),
+                'signal_squeeze': bool(r.get('signal_squeeze') or r.get('SignalSqueeze')),
+                'signal_distribution': bool(r.get('signal_distribution') or r.get('SignalDistribution')),
+                'signal_upbo': bool(r.get('signal_upbo') or r.get('SignalUpbo')),
+                'signal_goldensell': bool(r.get('signal_goldensell') or r.get('SignalGoldenSell')),
+                'signal_bigmoney': bool(r.get('signal_bigmoney') or r.get('SignalBigMoney')),
+                'radar_panicsell': bool(r.get('radar_panicsell') or r.get('RadarPanicSell')),
+                'radar_phankyam': bool(r.get('radar_phankyam') or r.get('RadarPhanKyAm')),
+                'radar_sangtay': bool(r.get('radar_sangtay') or r.get('RadarSangTay')),
+                'radar_daodong': bool(r.get('radar_daodong') or r.get('RadarDaoDong')),
+                'radar_gaynen': bool(r.get('radar_gaynen') or r.get('RadarGayNen')),
+                'radar_chammay': bool(r.get('radar_chammay') or r.get('RadarChamMay')),
+                'pyramid_action': r.get('pyramid_action') or r.get('PyramidAction'),
+                'base_distance_pct': r.get('base_distance_pct') or r.get('BaseDistancePct'),
+                'is_shark_dominated': bool(r.get('is_shark_dominated') or r.get('IsSharkDominated')),
+                'is_storm_resistant': bool(r.get('is_storm_resistant') or r.get('IsStormResistant')),
+                'rank': r.get('rank') or r.get('Rank'),
+                'buy_signal_status': r.get('buy_signal_status') or r.get('BuySignalStatus', 'N/A')
             })
-        
-        # If no results in SQL, trigger a one-time background scan (optional, but keep it simple for now)
-        if not mapped_results and not IS_VERCEL:
-            threading.Thread(target=MarketService.run_full_market_scan).start()
             
         return jsonify(mapped_results)
     except Exception as e:
