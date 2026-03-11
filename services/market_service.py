@@ -229,20 +229,37 @@ class MarketService:
 
     @staticmethod
     def get_top_leaders(limit: int = 5) -> list:
-        """
-        Scans a list of strong/liquid stocks across 3 exchanges and returns top N based on Leader Score.
-        """
-        from services.sql_utils import SQLUtils
-        
-        # 1. Check if we already have today's leaders saved in SQL
+        # 1. Check if we already have today's leaders saved in SQL (Historical refined)
         today = datetime.now().date().strftime('%Y-%m-%d')
         cached_leaders = SQLUtils.get_top_leaders_history(today)
         if cached_leaders and len(cached_leaders) >= limit:
-            logger.info("Returning cached top leaders from SQL.")
-            # Map history format back to expected format
+            logger.info("Returning refined top leaders from SQL.")
             return cached_leaders[:limit]
+            
+        # 2. Try the broader MarketAnalysis cache (Pre-computed)
+        logger.info("Checking MarketAnalysis cache for leaders...")
+        all_analysis = SQLUtils.get_all_market_analysis()
+        if all_analysis:
+            # Sort by LeaderScore descending
+            sorted_leaders = sorted(all_analysis, key=lambda x: x.get('LeaderScore', 0), reverse=True)
+            if sorted_leaders:
+                # Map MarketAnalysis fields to TopLeaders format
+                mapped_leaders = []
+                for l in sorted_leaders[:limit]:
+                    mapped_leaders.append({
+                        'symbol': l['Symbol'],
+                        'price': l['Price'],
+                        'change': l['ChangePct'],
+                        'score': l.get('LeaderScore', 0),
+                        'is_shark_dominated': l.get('IsSharkDominated', False),
+                        'is_storm_resistant': l.get('IsStormResistant', False),
+                        'tag': l.get('ActionRecommendation', 'Theo dõi')
+                    })
+                logger.info(f"Returning {len(mapped_leaders)} leaders from MarketAnalysis cache.")
+                return mapped_leaders
 
-        # 2. If not, select all liquid stocks from HOSE, HNX, UPCOM
+        # 3. Fallback to real-time scan (Last resort, slow)
+        logger.warning("No cache found for leaders. Falling back to real-time scan...")
         leader_universe = SymbolLoader.get_liquid_stocks()
         
         results = []
@@ -339,6 +356,8 @@ class MarketService:
                             'signal_squeeze': bool(last_row.get('Signal_Squeeze')),
                             'signal_distribution': bool(last_row.get('Signal_Distribution')),
                             'signal_upbo': bool(last_row.get('Signal_Upbo')),
+                            'signal_goldensell': bool(last_row.get('Signal_GoldenSell')),
+                            'signal_bigmoney': bool(last_row.get('Signal_BigMoney')),
                             'radar_panicsell': bool(last_row.get('Signal_PanicSell')),
                             'radar_phankyam': bool(last_row.get('Signal_PhanKyAmMACD')),
                             'radar_sangtay': bool(last_row.get('Signal_SangTayNhoLe')),
@@ -347,7 +366,9 @@ class MarketService:
                             'radar_chammay': bool(last_row.get('Signal_ChamMayKenhDuoi')),
                             'pyramid_action': SmartMoneyAnalyzer.get_pyramid_sizing(df),
                             'base_distance_pct': df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0,
-                            'score': score_data.get('score', 0)
+                            'score': score_data.get('score', 0),
+                            'is_shark_dominated': bool(score_data.get('is_shark_dominated', False)),
+                            'is_storm_resistant': bool(score_data.get('is_storm_resistant', False))
                         }
             except Exception as e:
                 logger.error(f"Error analyzing {symbol} during full scan: {e}")

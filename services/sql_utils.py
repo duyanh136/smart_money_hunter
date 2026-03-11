@@ -271,7 +271,9 @@ class SQLUtils:
                 SignalGoldenSell = {p}, SignalBigMoney = {p},
                 RadarPanicSell = {p}, RadarPhanKyAm = {p}, RadarSangTay = {p}, 
                 RadarDaoDong = {p}, RadarGayNen = {p}, RadarChamMay = {p},
-                PyramidAction = {p}, BaseDistancePct = {p}, UpdatedAt = GETDATE()
+                PyramidAction = {p}, BaseDistancePct = {p}, 
+                LeaderScore = {p}, IsSharkDominated = {p}, IsStormResistant = {p},
+                UpdatedAt = GETDATE()
             WHERE Symbol = {p}
         """
         
@@ -281,8 +283,9 @@ class SQLUtils:
                 SignalVoTeo, SignalBuyDip, SignalSuper, SignalBreakout, SignalSqueeze,
                 SignalDistribution, SignalUpbo, SignalGoldenSell, SignalBigMoney,
                 RadarPanicSell, RadarPhanKyAm, RadarSangTay, RadarDaoDong, 
-                RadarGayNen, RadarChamMay, PyramidAction, BaseDistancePct, UpdatedAt
-            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, GETDATE())
+                RadarGayNen, RadarChamMay, PyramidAction, BaseDistancePct,
+                LeaderScore, IsSharkDominated, IsStormResistant, UpdatedAt
+            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, GETDATE())
         """
         
         try:
@@ -303,7 +306,8 @@ class SQLUtils:
                     row.get('radar_panicsell', False), row.get('radar_phankyam', False),
                     row.get('radar_sangtay', False), row.get('radar_daodong', False),
                     row.get('radar_gaynen', False), row.get('radar_chammay', False),
-                    row.get('pyramid_action', ''), row.get('base_distance_pct', 0)
+                    row.get('pyramid_action', ''), row.get('base_distance_pct', 0),
+                    row.get('score', 0), row.get('is_shark_dominated', False), row.get('is_storm_resistant', False)
                 )
                 
                 # Try update first
