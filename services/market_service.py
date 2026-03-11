@@ -5,10 +5,10 @@ from typing import Optional, Dict, Any
 import time
 from datetime import datetime
 
-from services.tcbs_service import tcbs_service
-from services.tcbs_socket import tcbs_stream
+import os
 
 logger = logging.getLogger(__name__)
+IS_VERCEL = os.getenv('VERCEL') == '1'
 
 class MarketService:
     _cache = {}
@@ -230,60 +230,94 @@ class MarketService:
                 "macro": "N/A",
                 "class": "weather-rainy"
             }
+    _leaders_cache = {}
 
+    @staticmethod
+    def get_top_leaders(limit: int = 10) -> list:
+        """
+        Dashboard Leaderboard: 
+        Vercel Mode: DB lookup for stability (<1s).
+        Local Mode: Real-time scan with memory cache.
+        """
+        from services.sql_utils import SQLUtils
+        from services.symbol_loader import SymbolLoader
+        from services.smart_money import SmartMoneyAnalyzer
+        import concurrent.futures
+        
+        # 1. Cloud Stability Check
+        if IS_VERCEL:
+            logger.info("Vercel Mode: Fetching Top Leaders from SQL...")
+            db_results = SQLUtils.get_all_market_analysis()
+            if db_results:
+                # Sort by LeaderScore descending
+                sorted_results = sorted(db_results, key=lambda x: x.get('LeaderScore', 0), reverse=True)
+                mapped = []
+                for r in sorted_results[:limit]:
+                    mapped.append({
+                        'symbol': r['Symbol'],
+                        'price': r['Price'],
+                        'change': r['ChangePct'],
+                        'score': r['LeaderScore'],
+                        'tag': r.get('ActionRecommendation') or "🔥 Leader Dòng Tiền",
+                        'is_shark_dominated': bool(r.get('IsSharkDominated')),
+                        'is_storm_resistant': bool(r.get('IsStormResistant')),
+                        'rsi': r.get('RSI', 50),
+                        'signal_buydip': bool(r.get('SignalBuyDip'))
+                    })
+                return mapped
+            return []
 
-        # 3. Fallback to real-time scan (Last resort, slow)
-        logger.warning("No cache found for leaders. Falling back to real-time scan...")
+        # 2. Local Real-time Logic
+        now = datetime.now()
+        cache_key = f"leaders_{limit}"
+        if cache_key in MarketService._leaders_cache:
+            entry = MarketService._leaders_cache[cache_key]
+            if (now - entry['time']).total_seconds() < 300: # 5 mins
+                logger.info("Returning real-time leaders from memory cache.")
+                return entry['data']
+
+        # Perform fresh real-time scan for Local
+        logger.info("Performing local real-time market scan for leaderboard...")
+        
         leader_universe = SymbolLoader.get_liquid_stocks()
-        
         results = []
-        
-        # Get SSI as proxy for VNINDEX to measure market sentiment/resistance
         idx_df = MarketService.get_history("SSI", period="3mo")
         
         def score_symbol(symbol):
             try:
-                # Fetch recent history
                 df = MarketService.get_history(symbol, period="6mo")
                 if df is not None and not df.empty:
                     df = SmartMoneyAnalyzer.analyze(df)
                     score_data = SmartMoneyAnalyzer.calc_leader_score(df, index_df=idx_df)
-                    score = score_data.get('score', 0)
-                    
                     last_row = df.iloc[-1]
                     class_info = SmartMoneyAnalyzer.classify_stock(symbol)
                     
                     return {
                         'symbol': symbol,
-                        'score': score,
+                        'score': score_data.get('score', 0),
                         'is_shark_dominated': score_data.get('is_shark_dominated', False),
                         'is_storm_resistant': score_data.get('is_storm_resistant', False),
-                        'tag': class_info.get('tag', ''),
+                        'tag': class_info.get('tag', '') or "🔥 Leader Dòng Tiền",
                         'price': last_row['Close'],
                         'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2),
-                        'action': last_row.get('Action_Recommendation', 'N/A'),
-                        'signal_buydip': bool(last_row.get('Signal_BuyDip', False) or last_row.get('Signal_VoTeo', False)),
-                        'rsi': round(last_row.get('RSI', 50), 1)
+                        'rsi': round(last_row.get('RSI', 50), 1),
+                        'signal_buydip': bool(last_row.get('Signal_BuyDip', False) or last_row.get('Signal_VoTeo', False))
                     }
             except Exception as e:
                 logger.error(f"Error scoring {symbol}: {e}")
             return None
 
-        # Process in parallel to speed up 100+ requests
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             future_to_symbol = {executor.submit(score_symbol, sym): sym for sym in leader_universe}
             for future in concurrent.futures.as_completed(future_to_symbol):
                 res = future.result()
                 if res is not None:
                     results.append(res)
-                
-        # Sort by score descending and take top N
+        
         results.sort(key=lambda x: x['score'], reverse=True)
         final_leaders = results[:limit]
         
-        # Optional: Save to history automatically if it's during trading hours or end of day
-        # For now, we just return it. The 16:00 job handles the persistent daily save.
-        
+        MarketService._leaders_cache[cache_key] = {'time': now, 'data': final_leaders}
         return final_leaders
 
     @staticmethod

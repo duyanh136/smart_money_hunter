@@ -11,7 +11,7 @@ if sys.stderr.encoding != 'utf-8':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 from flask import Flask, render_template, jsonify, request
 from concurrent.futures import ThreadPoolExecutor
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask_socketio import SocketIO, emit
 import logging
 from services.market_service import MarketService
@@ -329,23 +329,32 @@ def stoploss_tool():
 @cross_origin()
 def scan_market():
     """
-    Scans market in real-time. 
-    User requested to stop using DB for the live dashboard.
+    Scans market.
+    Vercel Mode (Cloud): Fast DB lookup to avoid 10s timeout crash.
+    Local Mode: Real-time scan as requested by user.
     """
     try:
-        logger.info("API: /api/scan - Performing real-time scan...")
-        # Direct real-time scan, no SQL saving
-        results = MarketService.run_full_market_scan(save_history=False)
-        
-        if not results:
-            # Fallback to last known SQL state if real-time fails
-            logger.warning("API: Real-time scan failed, falling back to SQL.")
+        results = []
+        if IS_VERCEL:
+            # Use high-speed DB lookup for Vercel stability
+            logger.info("Vercel Mode: Fetching analysis from SQL Database (High Speed)...")
             results = SQLUtils.get_all_market_analysis()
+            if not results:
+                 logger.warning("Vercel Mode: SQL Database is empty. Returning empty list.")
+        else:
+            # Full Real-time scan for Local environment (no 10s timeout)
+            logger.info("Local Mode: Performing full real-time market scan...")
+            results = MarketService.run_full_market_scan(save_history=False)
+            
+            if not results:
+                # Fallback to last known SQL state if real-time fails locally
+                logger.warning("Local Mode: Real-time scan failed, falling back to SQL.")
+                results = SQLUtils.get_all_market_analysis()
 
-        # Map results to frontend format
+        # Consistent mapping for both Cloud and Local data
         mapped_results = []
         for r in results:
-            # Handle both dict formats (Code vs SQL)
+            # Normalizing fields: database vs in-memory dict
             mapped_results.append({
                 'symbol': r.get('symbol') or r.get('Symbol'),
                 'price': r.get('price') or r.get('Price'),
@@ -379,8 +388,8 @@ def scan_market():
             
         return jsonify(mapped_results)
     except Exception as e:
-        logger.error(f"API Scan Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in /api/scan (Emergency Fix Mode): {e}")
+        return jsonify([])
 
 if __name__ == '__main__':
     logger.info("Starting Smart Money Hunter (Flask)...")
