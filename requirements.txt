@@ -6,7 +6,7 @@ yfinance
 multitasking==0.0.11
 requests
 websocket-client
-pandas-ta
+# pandas-ta (replaced by ta_mock)
 numpy
 python-dotenv
 schedule

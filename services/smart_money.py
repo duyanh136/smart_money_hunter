@@ -1,5 +1,5 @@
 import pandas as pd
-import pandas_ta as ta
+from . import ta_mock as ta
 import numpy as np
 
 class SmartMoneyAnalyzer:

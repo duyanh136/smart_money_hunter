@@ -1,4 +1,6 @@
 venv/
+venv_wsl/
+venv_wsl_8/
 __pycache__/
 *.pyc
 .env
