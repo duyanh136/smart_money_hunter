@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from services.market_service import MarketService
 from services.smart_money import SmartMoneyAnalyzer
+from services.sql_utils import SQLUtils
 
 load_dotenv()
 
@@ -33,7 +34,8 @@ def init_portfolio_cache():
                 'current_sl': float(item.get('current_sl', 0)),
                 'alert_sent': bool(item.get('alert_sent', False))
             }
-    portfolio_cache = new_cache
+    portfolio_cache.clear()
+    portfolio_cache.update(new_cache)
 
 def reload_telegram_bot_cache():
     logger.info("Forcing Telegram Bot Portfolio Cache Reload...")
@@ -357,12 +359,35 @@ def check_portfolio_and_send_alert():
     except Exception as e:
         logger.error(f"Error sending Telegram message: {e}")
 
+def auto_save_daily_leaders():
+    """Fetches Top 10 leaders and saves them to SQL History."""
+    logger.info("Executing daily 16:00 Top 10 Leader Scan and Save...")
+    try:
+        leaders = MarketService.get_top_leaders(limit=10)
+        if leaders:
+            SQLUtils.save_top_leaders_history(leaders)
+            logger.info("Successfully saved daily leaders to SQL.")
+            
+            # Optional: Send a summary to Telegram
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+            chat_id = os.getenv("TELEGRAM_CHAT_ID")
+            if bot_token and chat_id:
+                leader_names = ", ".join([l['symbol'] for l in leaders])
+                msg = f"🏆 <b>TOP 10 LÊN TÀU (DAILY SCAN)</b>\n\nDanh sách: {leader_names}\n\n<i>Dữ liệu đã được lưu trữ vào SQL Server để tra cứu lịch sử.</i>"
+                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                requests.post(url, json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}, timeout=5)
+    except Exception as e:
+        logger.error(f"Error in auto_save_daily_leaders: {e}")
+
 def run_bot_scheduler():
     logger.info("Initializing Telegram Bot Scheduler & Cache...")
     init_portfolio_cache()
     
     # Schedule every 30 minutes
     schedule.every(30).minutes.do(check_portfolio_and_send_alert)
+    
+    # Daily scan at 16:00 (After Market Close)
+    schedule.every().day.at("16:00").do(auto_save_daily_leaders)
     
     while True:
         schedule.run_pending()

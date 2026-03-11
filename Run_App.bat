@@ -26,6 +26,8 @@ echo SERVER IS RUNNING
 echo Access at http://127.0.0.1:5000
 echo ========================================
 
-"%~dp0venv\Scripts\python.exe" app.py
+echo Starting Git Auto-Sync in background...
+start "" "%~dp0venv\Scripts\python.exe" git_auto_sync.py
 
+"%~dp0venv\Scripts\python.exe" app.py
 pause

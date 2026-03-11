@@ -19,6 +19,7 @@ from services.smart_money import SmartMoneyAnalyzer
 from services.tcbs_service import tcbs_service
 from services.tcbs_socket import tcbs_stream
 from services.telegram_bot import run_bot_scheduler, check_realtime_stoploss, load_portfolio, reload_telegram_bot_cache
+from services.sql_utils import SQLUtils
 import threading
 import pandas as pd
 import json
@@ -132,6 +133,18 @@ def get_top_leaders():
         return jsonify(leaders)
     except Exception as e:
         logger.error(f"API top_leaders error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/top_leaders_history')
+def get_top_leaders_history():
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({'error': 'Missing date parameter'}), 400
+    try:
+        history = SQLUtils.get_top_leaders_history(date_str)
+        return jsonify(history)
+    except Exception as e:
+        logger.error(f"API top_leaders_history error: {e}")
         return jsonify({'error': str(e)}), 500
 
 # Global Watchlist

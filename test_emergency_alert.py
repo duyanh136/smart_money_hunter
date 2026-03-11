@@ -7,7 +7,7 @@ init_portfolio_cache()
 
 print(f"Current Cache State: {json.dumps(portfolio_cache, indent=2)}")
 
-symbol = 'BCM'
+symbol = 'POW'
 # Portfolio has BCM with SL around 62.0
 crash_price = 55.0
 
