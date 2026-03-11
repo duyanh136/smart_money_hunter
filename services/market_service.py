@@ -93,11 +93,15 @@ class MarketService:
         return 0.0
 
     @staticmethod
-    def get_market_health() -> Dict[str, Any]:
+    def get_market_health() -> list:
         """
         Calculates VN-INDEX vs VN-INDEX (Excluding Vin Family).
         Market Health Check.
         """
+        from services.sql_utils import SQLUtils
+        cached = SQLUtils.get_cached_data('market_health')
+        if cached: return cached
+
         try:
             # Fetch VN-INDEX and Vin Group
             indices = ['^VNINDEX', 'VIC.VN', 'VHM.VN', 'VRE.VN']
@@ -155,6 +159,8 @@ class MarketService:
                     'vin_basket': vin_val
                 })
                 
+                
+            SQLUtils.set_cached_data('market_health', result, expiry_mins=30)
             return result
 
         except Exception as e:
@@ -170,6 +176,10 @@ class MarketService:
         2. Liquidity (Vol)
         3. Leading Sectors (Banks, Oil, Tech)
         """
+        from services.sql_utils import SQLUtils
+        cached = SQLUtils.get_cached_data('market_weather')
+        if cached: return cached
+
         try:
             # Mocking Interbank Interest Rate (Critical for 'Macro' view)
             # In real app, fetch from state bank website or specialized API
@@ -199,12 +209,15 @@ class MarketService:
                     action = "Cầm Tiền / Đi Chơi"
                     bg_class = "weather-storm"
             
-            return {
+            res = {
                 "weather": weather,
                 "action": action,
                 "macro": f"Lãi suất NH: {interest_rate}% ({money_supply_status})",
                 "class": bg_class
             }
+            
+            SQLUtils.set_cached_data('market_weather', res, expiry_mins=30)
+            return res
         except Exception as e:
             logger.error(f"Error getting market weather: {e}")
             return {
@@ -219,11 +232,17 @@ class MarketService:
         """
         Scans a list of strong/liquid stocks across 3 exchanges and returns top N based on Leader Score.
         """
-        from services.symbol_loader import SymbolLoader
-        from services.smart_money import SmartMoneyAnalyzer
-        import concurrent.futures
+        from services.sql_utils import SQLUtils
         
-        # Select all liquid stocks from HOSE, HNX, UPCOM
+        # 1. Check if we already have today's leaders saved in SQL
+        today = datetime.now().date().strftime('%Y-%m-%d')
+        cached_leaders = SQLUtils.get_top_leaders_history(today)
+        if cached_leaders and len(cached_leaders) >= limit:
+            logger.info("Returning cached top leaders from SQL.")
+            # Map history format back to expected format
+            return cached_leaders[:limit]
+
+        # 2. If not, select all liquid stocks from HOSE, HNX, UPCOM
         leader_universe = SymbolLoader.get_liquid_stocks()
         
         results = []
@@ -269,4 +288,9 @@ class MarketService:
                 
         # Sort by score descending and take top N
         results.sort(key=lambda x: x['score'], reverse=True)
-        return results[:limit]
+        final_leaders = results[:limit]
+        
+        # Optional: Save to history automatically if it's during trading hours or end of day
+        # For now, we just return it. The 16:00 job handles the persistent daily save.
+        
+        return final_leaders

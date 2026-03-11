@@ -199,3 +199,59 @@ class SQLUtils:
         finally:
             conn.close()
         return results
+
+    @staticmethod
+    def set_cached_data(key: str, data: Any, expiry_mins: int = 60):
+        """Saves arbitrary JSON-serializable data to SystemCache."""
+        conn = SQLUtils.get_connection()
+        if not conn: return
+        
+        import json
+        from datetime import timedelta
+        p = SQLUtils._get_placeholder(conn)
+        
+        val_str = json.dumps(data)
+        expiry_time = datetime.now() + timedelta(minutes=expiry_mins)
+        
+        sql = f"""
+        IF EXISTS (SELECT 1 FROM SystemCache WHERE CacheKey = {p})
+            UPDATE SystemCache SET CacheValue = {p}, ExpiryTime = {p}, UpdatedAt = GETDATE() WHERE CacheKey = {p}
+        ELSE
+            INSERT INTO SystemCache (CacheKey, CacheValue, ExpiryTime, UpdatedAt) VALUES ({p}, {p}, {p}, GETDATE())
+        """
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql, (key, val_str, expiry_time, key, key, val_str, expiry_time))
+            if not getattr(conn, 'autocommit', False):
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error setting cache for {key}: {e}")
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_cached_data(key: str) -> Optional[Any]:
+        """Retrieves and deserializes data from SystemCache if not expired."""
+        conn = SQLUtils.get_connection()
+        if not conn: return None
+        
+        import json
+        p = SQLUtils._get_placeholder(conn)
+        sql = f"SELECT CacheValue, ExpiryTime FROM SystemCache WHERE CacheKey = {p}"
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql, (key,))
+            row = cursor.fetchone()
+            if row:
+                val_str, expiry_time = row
+                if expiry_time > datetime.now():
+                    return json.loads(val_str)
+                else:
+                    logger.info(f"Cache expired for {key}")
+        except Exception as e:
+            logger.error(f"Error getting cache for {key}: {e}")
+        finally:
+            conn.close()
+        return None
