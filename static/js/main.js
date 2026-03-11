@@ -283,10 +283,33 @@ async function loadData(symbol, period = '1y') {
             return;
         }
 
-        // Update UI Info
+        // Update Stock Info Metadata
         document.getElementById('stock-symbol').innerText = data.symbol;
         document.getElementById('stock-group').innerText = data.group;
-        document.getElementById('strategy-text').innerText = data.strategy;
+        document.getElementById('stock-strategy').innerText = data.strategy;
+        document.getElementById('stock-phase').innerText = data.market_phase;
+        document.getElementById('stock-action').innerText = data.action;
+        document.getElementById('stock-base').innerText = `${data.base_distance_pct}% (Độ thắt chặt)`;
+
+        // --- NEW: Update Badges & Vietnamese Buy Signal Status ---
+        const badgeContainer = document.getElementById('badges-container');
+        if (badgeContainer) {
+            badgeContainer.innerHTML = '';
+            if (data.is_shark_dominated) {
+                badgeContainer.innerHTML += '<span class="badge badge-shark">💎 Tiền Lớn</span>';
+            }
+            if (data.is_storm_resistant) {
+                badgeContainer.innerHTML += '<span class="badge badge-storm">🛡️ Kháng Bão</span>';
+            }
+        }
+        
+        const signalStatusEl = document.getElementById('buy-signal-status');
+        if (signalStatusEl) {
+            signalStatusEl.innerText = data.buy_signal_status || "Quan Sát / Chờ Điểm Mua";
+            if (data.buy_signal_status === "🚨 BÁO ĐỘNG MÚC") signalStatusEl.style.color = '#4CAF50';
+            else if (data.buy_signal_status === "🛑 CẤM ĐU XANH TÍM") signalStatusEl.style.color = '#ff6b6b';
+            else signalStatusEl.style.color = '#e4e6eb';
+        }
 
         // Update Volume Info
         const last = data.data[data.data.length - 1];

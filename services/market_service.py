@@ -191,6 +191,9 @@ class MarketService:
             
             # Fetch Index Data
             vnindex = MarketService.get_history("^VNINDEX", period="1mo")
+            if vnindex is None or vnindex.empty:
+                logger.warning("MarketWeather: VNINDEX fetch failed, using SSI as proxy.")
+                vnindex = MarketService.get_history("SSI", period="1mo")
             
             weather = "Mưa Rào (Sideway)"
             action = "Quan Sát / Mua Gom"

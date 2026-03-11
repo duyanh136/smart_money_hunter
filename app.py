@@ -101,18 +101,20 @@ def get_history_data():
         })
         
     # Try to get pre-computed analysis from SQL to save time
-    all_analysis = SQLUtils.get_all_market_analysis()
-    cached = next((item for item in all_analysis if item['Symbol'] == symbol), None)
+    cached = SQLUtils.get_analysis_by_symbol(symbol)
 
     return jsonify({
         'symbol': symbol,
         'group': class_info['group'],
         'strategy': class_info['strategy'],
-        'market_phase': (cached['MarketPhase'] if cached else df['Market_Phase'].iloc[-1]) if 'Market_Phase' in df or cached else "N/A",
-        'action': (cached['ActionRecommendation'] if cached else df['Action_Recommendation'].iloc[-1]) if 'Action_Recommendation' in df or cached else "N/A",
+        'market_phase': (cached['MarketPhase'] if cached else (df['Market_Phase'].iloc[-1] if 'Market_Phase' in df else "N/A")),
+        'action': (cached['ActionRecommendation'] if cached else (df['Action_Recommendation'].iloc[-1] if 'Action_Recommendation' in df else "N/A")),
         'poc': df['POC'].iloc[-1] if 'POC' in df else 0,
         'pyramid_action': cached['PyramidAction'] if cached else SmartMoneyAnalyzer.get_pyramid_sizing(df),
         'base_distance_pct': cached['BaseDistancePct'] if cached else (df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0),
+        'is_shark_dominated': cached['IsSharkDominated'] if cached else False,
+        'is_storm_resistant': cached['IsStormResistant'] if cached else False,
+        'buy_signal_status': cached['BuySignalStatus'] if cached else SmartMoneyAnalyzer.get_buy_signal_status(df),
         'data': result
     })
 
@@ -350,6 +352,8 @@ def scan_market():
                 'signal_squeeze': bool(r['SignalSqueeze']),
                 'signal_distribution': bool(r['SignalDistribution']),
                 'signal_upbo': bool(r['SignalUpbo']),
+                'signal_goldensell': bool(r.get('SignalGoldenSell', False)),
+                'signal_bigmoney': bool(r.get('SignalBigMoney', False)),
                 'radar_panicsell': bool(r['RadarPanicSell']),
                 'radar_phankyam': bool(r['RadarPhanKyAm']),
                 'radar_sangtay': bool(r['RadarSangTay']),
@@ -357,7 +361,11 @@ def scan_market():
                 'radar_gaynen': bool(r['RadarGayNen']),
                 'radar_chammay': bool(r['RadarChamMay']),
                 'pyramid_action': r['PyramidAction'],
-                'base_distance_pct': r['BaseDistancePct']
+                'base_distance_pct': r['BaseDistancePct'],
+                'is_shark_dominated': bool(r.get('IsSharkDominated', False)),
+                'is_storm_resistant': bool(r.get('IsStormResistant', False)),
+                'rank': r.get('Rank'),
+                'buy_signal_status': r.get('BuySignalStatus', 'N/A')
             })
         
         # If no results in SQL, trigger a one-time background scan (optional, but keep it simple for now)

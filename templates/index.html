@@ -189,22 +189,30 @@
                             style="background: #333; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">--</span>
                     </div>
 
+                    <div id="badges-container" style="margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
+
                     <h1 id="current-price" style="margin: 10px 0;">--</h1>
 
                     <div id="volume-info" style="font-size: 0.9em; color: #8b949e; margin-bottom: 10px;">
                         Vol: <span id="current-vol" style="color: #f0f6fc; font-weight: bold;">--</span>
                     </div>
 
+                    <div style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                        <div style="font-size: 0.75rem; color: #8b949e; text-transform: uppercase;">Trạng thái MUA</div>
+                        <div id="buy-signal-status" style="font-size: 1.1rem; font-weight: bold; margin-top: 2px;">Đang quét...</div>
+                    </div>
+
                     <div class="strategy-box">
                         <div class="strategy-title">CHIẾN LƯỢC GỢI Ý</div>
-                        <div id="strategy-text" class="strategy-content">--</div>
+                        <div id="stock-strategy" class="strategy-content">--</div>
                     </div>
                 </div>
 
                 <div class="card phase-card" id="phase-card">
                     <h3>Giai đoạn cổ phiếu</h3>
-                    <p id="phase-value">N/A</p>
-                    <div id="action-value" style="margin-top: 5px; font-weight: bold; color: #4CAF50;">--</div>
+                    <p id="stock-phase">N/A</p>
+                    <div id="stock-action" style="margin-top: 5px; font-weight: bold; color: #4CAF50;">--</div>
+                    <div id="stock-base" style="font-size: 0.8em; color: #8b949e; margin-top: 5px;">--</div>
                 </div>
 
                 <div class="card signals-card">

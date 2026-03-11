@@ -379,19 +379,53 @@ class SQLUtils:
 
     @staticmethod
     def get_all_market_analysis() -> List[Dict[str, Any]]:
-        """Retrieves all market analysis results from the database."""
-        results = []
+        """Fetch all results from MarketAnalysis table."""
         conn = SQLUtils.get_connection()
-        if not conn: return results
+        if not conn: return []
         
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM MarketAnalysis")
+            cursor.execute("""
+                SELECT Symbol, Price, ChangePct, VolRatio, RSI, 
+                       MarketPhase, ActionRecommendation, 
+                       SignalVoTeo, SignalBuyDip, SignalSuper, SignalBreakout, 
+                       SignalSqueeze, SignalDistribution, SignalUpbo,
+                       SignalGoldenSell, SignalBigMoney,
+                       RadarPanicSell, RadarPhanKyAm, RadarSangTay, 
+                       RadarDaoDong, RadarGayNen, RadarChamMay,
+                       PyramidAction, BaseDistancePct, LeaderScore, Rank, BuySignalStatus
+                FROM MarketAnalysis
+            """)
             columns = [column[0] for column in cursor.description]
+            results = []
             for row in cursor.fetchall():
                 results.append(dict(zip(columns, row)))
+            return results
         except Exception as e:
             logger.error(f"Error fetching market analysis: {e}")
+            return []
         finally:
             conn.close()
-        return results
+
+    @staticmethod
+    def get_analysis_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+        """Fetch technical analysis for a specific symbol from SQL cache."""
+        conn = SQLUtils.get_connection()
+        if not conn: return None
+        
+        try:
+            cursor = conn.cursor()
+            p = SQLUtils._get_placeholder(conn)
+            cursor.execute(f"""
+                SELECT * FROM MarketAnalysis WHERE Symbol = {p}
+            """, (symbol,))
+            
+            row = cursor.fetchone()
+            if row:
+                columns = [column[0] for column in cursor.description]
+                return dict(zip(columns, row))
+        except Exception as e:
+            logger.error(f"Error fetching analysis for {symbol}: {e}")
+        finally:
+            conn.close()
+        return None
