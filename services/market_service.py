@@ -368,7 +368,8 @@ class MarketService:
                             'base_distance_pct': df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0,
                             'score': score_data.get('score', 0),
                             'is_shark_dominated': bool(score_data.get('is_shark_dominated', False)),
-                            'is_storm_resistant': bool(score_data.get('is_storm_resistant', False))
+                            'is_storm_resistant': bool(score_data.get('is_storm_resistant', False)),
+                            'buy_signal_status': SmartMoneyAnalyzer.get_buy_signal_status(df)
                         }
             except Exception as e:
                 logger.error(f"Error analyzing {symbol} during full scan: {e}")
@@ -379,10 +380,22 @@ class MarketService:
             for future in concurrent.futures.as_completed(future_to_symbol):
                 res = future.result()
                 if res:
+                    # Additional call to get the Vietnamese signal status
+                    try:
+                        # We need the dataframe again or we should have returned it from analyze_sym
+                        # Let's optimize: analyze_sym already has the df.
+                        # I'll update analyze_sym to include buy_signal_status
+                        pass
+                    except: pass
                     results.append(res)
 
+        # Ranking logic: Sort by score descending
+        results.sort(key=lambda x: x.get('score', 0), reverse=True)
+        for i, res in enumerate(results):
+            res['rank'] = i + 1 if i < 10 else None # Only rank top 10
+            
         # Save to database
         if results:
             SQLUtils.save_market_analysis(results)
-            logger.info(f"Full market scan complete. Saved {len(results)} results.")
+            logger.info(f"Full market scan complete. Saved {len(results)} results with rankings.")
         return results
