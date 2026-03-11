@@ -368,7 +368,13 @@ def auto_save_daily_leaders():
             SQLUtils.save_top_leaders_history(leaders)
             logger.info("Successfully saved daily leaders to SQL.")
             
-            # Optional: Send a summary to Telegram
+        # Also run the FULL market scan for all stocks
+        logger.info("Executing comprehensive full market scan...")
+        MarketService.run_full_market_scan()
+        logger.info("Successfully finished full market scan and saved to SQL.")
+        
+        # Optional: Send a summary to Telegram
+        if leaders:
             bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
             chat_id = os.getenv("TELEGRAM_CHAT_ID")
             if bot_token and chat_id:
@@ -387,8 +393,29 @@ def run_bot_scheduler():
     schedule.every(30).minutes.do(check_portfolio_and_send_alert)
     
     # Daily scan at 16:00 (After Market Close)
+    # Job 1: Daily scan at 16:00
     schedule.every().day.at("16:00").do(auto_save_daily_leaders)
     
+    # Job 2: Hourly scan during trading session (9:00 - 15:00)
+    # This ensures the cache is fresh for daytime users
+    def hourly_trading_scan():
+        now = datetime.now()
+        # Mon-Fri, 9am-4pm
+        if now.weekday() < 5 and 9 <= now.hour <= 16:
+            logger.info("Scheduled Hourly Trading Scan triggered...")
+            MarketService.run_full_market_scan()
+            
+    schedule.every().hour.at(":05").do(hourly_trading_scan)
+    
+    # Job 3: One-time scan at startup to warm up the cache
+    def startup_warmup():
+        logger.info("Startup cache warmup triggered...")
+        MarketService.run_full_market_scan()
+    
+    # Run startup warmup in a separate thread to not block the main loop
+    threading.Thread(target=startup_warmup, daemon=True).start()
+
+    logger.info("Telegram Bot Scheduler started. Jobs scheduled: 16:00 Daily + Hourly Trading.")
     while True:
         schedule.run_pending()
         time.sleep(60)

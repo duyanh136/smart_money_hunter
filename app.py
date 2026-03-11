@@ -100,15 +100,19 @@ def get_history_data():
             'base_distance_pct': row['Base_Distance_Pct'] if 'Base_Distance_Pct' in row else 0
         })
         
+    # Try to get pre-computed analysis from SQL to save time
+    all_analysis = SQLUtils.get_all_market_analysis()
+    cached = next((item for item in all_analysis if item['Symbol'] == symbol), None)
+
     return jsonify({
         'symbol': symbol,
         'group': class_info['group'],
         'strategy': class_info['strategy'],
-        'market_phase': df['Market_Phase'].iloc[-1] if 'Market_Phase' in df else "N/A", # Global Phase (Current)
-        'action': df['Action_Recommendation'].iloc[-1] if 'Action_Recommendation' in df else "N/A",
+        'market_phase': (cached['MarketPhase'] if cached else df['Market_Phase'].iloc[-1]) if 'Market_Phase' in df or cached else "N/A",
+        'action': (cached['ActionRecommendation'] if cached else df['Action_Recommendation'].iloc[-1]) if 'Action_Recommendation' in df or cached else "N/A",
         'poc': df['POC'].iloc[-1] if 'POC' in df else 0,
-        'pyramid_action': SmartMoneyAnalyzer.get_pyramid_sizing(df),
-        'base_distance_pct': df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0,
+        'pyramid_action': cached['PyramidAction'] if cached else SmartMoneyAnalyzer.get_pyramid_sizing(df),
+        'base_distance_pct': cached['BaseDistancePct'] if cached else (df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0),
         'data': result
     })
 
@@ -321,98 +325,49 @@ def stoploss_tool():
 
 @app.route('/api/scan')
 def scan_market():
-    results = []
-    
-    # Use ThreadPool to scan in parallel
-    # We can scan all or limit
-    
-    def scan_symbol(symbol):
-        try:
-            # Get latest price from socket if available to skip REST call?
-            # No, we need full history for analysis (Signals)
-            # Get history
-            df = MarketService.get_history(symbol, period='6mo')
+    """
+    Returns pre-computed analysis from SQL Server MarketAnalysis table.
+    Very fast, loads results from the background worker.
+    """
+    try:
+        results = SQLUtils.get_all_market_analysis()
+        
+        # Map SQL column names to frontend expected names
+        mapped_results = []
+        for r in results:
+            mapped_results.append({
+                'symbol': r['Symbol'],
+                'price': r['Price'],
+                'change': r['ChangePct'],
+                'vol_ratio': r['VolRatio'],
+                'rsi': r['RSI'],
+                'market_phase': r['MarketPhase'],
+                'action': r['ActionRecommendation'],
+                'signal_voteo': bool(r['SignalVoTeo']),
+                'signal_buydip': bool(r['SignalBuyDip']),
+                'signal_super': bool(r['SignalSuper']),
+                'signal_breakout': bool(r['SignalBreakout']),
+                'signal_squeeze': bool(r['SignalSqueeze']),
+                'signal_distribution': bool(r['SignalDistribution']),
+                'signal_upbo': bool(r['SignalUpbo']),
+                'radar_panicsell': bool(r['RadarPanicSell']),
+                'radar_phankyam': bool(r['RadarPhanKyAm']),
+                'radar_sangtay': bool(r['RadarSangTay']),
+                'radar_daodong': bool(r['RadarDaoDong']),
+                'radar_gaynen': bool(r['RadarGayNen']),
+                'radar_chammay': bool(r['RadarChamMay']),
+                'pyramid_action': r['PyramidAction'],
+                'base_distance_pct': r['BaseDistancePct']
+            })
+        
+        # If no results in SQL, trigger a one-time background scan (optional, but keep it simple for now)
+        if not mapped_results and not IS_VERCEL:
+            threading.Thread(target=MarketService.run_full_market_scan).start()
             
-            if df is not None and not df.empty:
-                df = SmartMoneyAnalyzer.analyze(df)
-                if df is not None and not df.empty:
-                    last_row = df.iloc[-1]
-                    
-                    return {
-                        'symbol': symbol,
-                        'price': last_row['Close'],
-                        'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2),
-                        'vol_ratio': round(last_row['Vol_Ratio'], 2),
-                        'rsi': round(last_row['RSI'], 1),
-                        'market_phase': df['Market_Phase'].iloc[-1],
-                        'action': df['Action_Recommendation'].iloc[-1],
-                        # Signals
-                        'signal_voteo': bool(last_row.get('Signal_VoTeo')),
-                        'signal_buydip': bool(last_row.get('Signal_BuyDip')),
-                        'signal_breakout': bool(last_row.get('Signal_Breakout')),
-                        'signal_goldensell': bool(last_row.get('Signal_GoldenSell')),
-                        'signal_warning': bool(last_row.get('Signal_Distribution') or last_row.get('Signal_UpBo')),
-                        # Radar Signals
-                        'radar_panicsell': bool(last_row.get('Signal_PanicSell')),
-                        'radar_sangtay': bool(last_row.get('Signal_SangTayNhoLe')),
-                        'radar_gaynen': bool(last_row.get('Signal_GayNenTestLai')),
-                        'radar_phankyam': bool(last_row.get('Signal_PhanKyAmMACD')),
-                        'radar_daodong': bool(last_row.get('Signal_DaoDongLongLeo')),
-                        'radar_chammay': bool(last_row.get('Signal_ChamMayKenhDuoi')),
-                        'pyramid_action': SmartMoneyAnalyzer.get_pyramid_sizing(df),
-                        'base_distance_pct': round(last_row.get('Base_Distance_Pct', 0), 2)
-                    }
-                    
-            # Fallback for stocks with no history (e.g. TCBS API broken for UPCOM)
-            # Try to get snapshot info to at least show Price
-            info = tcbs_service.get_ticker_info(symbol)
-            if info:
-                # { 'price': x, 'refPrice': y, 'volume': z, ... }
-                curr_price = info.get('price') or info.get('refPrice') or 0
-                ref_price = info.get('refPrice') or curr_price
-                change = 0
-                if ref_price > 0:
-                    change = round((curr_price - ref_price) / ref_price * 100, 2)
-                    
-                return {
-                    'symbol': symbol,
-                    'price': curr_price,
-                    'change': change,
-                    'vol_ratio': 0,
-                    'rsi': 0,
-                    'market_phase': "Không có lịch sử",
-                    'action': "Chỉ báo giá (N/A)",
-                    # Signals all False
-                    'signal_voteo': False,
-                    'signal_buydip': False,
-                    'signal_breakout': False,
-                    'signal_goldensell': False,
-                    'signal_warning': False,
-                    # Radar Signals
-                    'radar_panicsell': False,
-                    'radar_sangtay': False,
-                    'radar_phankyam': False,
-                    'radar_daodong': False,
-                    'radar_chammay': False,
-                    'pyramid_action': "N/A",
-                    'base_distance_pct': 0
-                }
-
-        except Exception as e:
-            logger.error(f"Scan error {symbol}: {e}")
-        return None
-
-    # Limit max workers to avoid overload
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        # Check first 30 for now to be fast, or all?
-        # User wants FAST.
-        # Let's scan all but rely on cache in MarketService
-        futures = executor.map(scan_symbol, WATCHLIST)
-        for res in futures:
-            if res:
-                results.append(res)
-    
-    return jsonify(results)
+        return jsonify(mapped_results)
+    except Exception as e:
+        logger.error(f"API Scan Error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     logger.info("Starting Smart Money Hunter (Flask)...")

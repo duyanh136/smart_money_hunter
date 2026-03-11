@@ -252,6 +252,88 @@ class SQLUtils:
                     logger.info(f"Cache expired for {key}")
         except Exception as e:
             logger.error(f"Error getting cache for {key}: {e}")
+        return None
+
+    @staticmethod
+    def save_market_analysis(analysis_data: List[Dict[str, Any]]):
+        """Saves pre-computed analysis results for multiple symbols."""
+        conn = SQLUtils.get_connection()
+        if not conn: return
+        
+        p = SQLUtils._get_placeholder(conn)
+        # Using a simpler logic: iterate and execute update or insert
+        sql_update = f"""
+            UPDATE MarketAnalysis SET 
+                Price = {p}, ChangePct = {p}, VolRatio = {p}, RSI = {p}, 
+                MarketPhase = {p}, ActionRecommendation = {p},
+                SignalVoTeo = {p}, SignalBuyDip = {p}, SignalSuper = {p}, SignalBreakout = {p}, 
+                SignalSqueeze = {p}, SignalDistribution = {p}, SignalUpbo = {p},
+                SignalGoldenSell = {p}, SignalBigMoney = {p},
+                RadarPanicSell = {p}, RadarPhanKyAm = {p}, RadarSangTay = {p}, 
+                RadarDaoDong = {p}, RadarGayNen = {p}, RadarChamMay = {p},
+                PyramidAction = {p}, BaseDistancePct = {p}, UpdatedAt = GETDATE()
+            WHERE Symbol = {p}
+        """
+        
+        sql_insert = f"""
+            INSERT INTO MarketAnalysis (
+                Symbol, Price, ChangePct, VolRatio, RSI, MarketPhase, ActionRecommendation,
+                SignalVoTeo, SignalBuyDip, SignalSuper, SignalBreakout, SignalSqueeze,
+                SignalDistribution, SignalUpbo, SignalGoldenSell, SignalBigMoney,
+                RadarPanicSell, RadarPhanKyAm, RadarSangTay, RadarDaoDong, 
+                RadarGayNen, RadarChamMay, PyramidAction, BaseDistancePct, UpdatedAt
+            ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, GETDATE())
+        """
+        
+        try:
+            cursor = conn.cursor()
+            for row in analysis_data:
+                sym = row.get('symbol', '').upper()
+                if not sym: continue
+                
+                # Common values for both Insert and Update
+                # Order matters!
+                vals = (
+                    row.get('price', 0), row.get('change', 0), row.get('vol_ratio', 0), row.get('rsi', 0),
+                    row.get('market_phase', ''), row.get('action', ''),
+                    row.get('signal_voteo', False), row.get('signal_buydip', False), row.get('signal_super', False),
+                    row.get('signal_breakout', False), row.get('signal_squeeze', False),
+                    row.get('signal_distribution', False), row.get('signal_upbo', False),
+                    row.get('signal_goldensell', False), row.get('signal_bigmoney', False),
+                    row.get('radar_panicsell', False), row.get('radar_phankyam', False),
+                    row.get('radar_sangtay', False), row.get('radar_daodong', False),
+                    row.get('radar_gaynen', False), row.get('radar_chammay', False),
+                    row.get('pyramid_action', ''), row.get('base_distance_pct', 0)
+                )
+                
+                # Try update first
+                cursor.execute(sql_update, vals + (sym,))
+                if cursor.rowcount == 0:
+                    # Not found, do insert
+                    cursor.execute(sql_insert, (sym,) + vals)
+            
+            if not getattr(conn, 'autocommit', False):
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error saving market analysis: {e}")
         finally:
             conn.close()
-        return None
+
+    @staticmethod
+    def get_all_market_analysis() -> List[Dict[str, Any]]:
+        """Retrieves all market analysis results from the database."""
+        results = []
+        conn = SQLUtils.get_connection()
+        if not conn: return results
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM MarketAnalysis")
+            columns = [column[0] for column in cursor.description]
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+        except Exception as e:
+            logger.error(f"Error fetching market analysis: {e}")
+        finally:
+            conn.close()
+        return results

@@ -294,3 +294,74 @@ class MarketService:
         # For now, we just return it. The 16:00 job handles the persistent daily save.
         
         return final_leaders
+
+    @staticmethod
+    def run_full_market_scan():
+        """
+        Scans all major stocks and saves pre-computed analysis to SQL Server.
+        This allows the web UI to load nearly instantly.
+        """
+        from services.symbol_loader import SymbolLoader
+        from services.smart_money import SmartMoneyAnalyzer
+        from services.sql_utils import SQLUtils
+        import concurrent.futures
+        
+        # Get all liquid stocks
+        universe = SymbolLoader.get_liquid_stocks()
+        logger.info(f"Starting full market scan for {len(universe)} symbols...")
+        
+        # Get proxy for Index Correlation
+        idx_df = MarketService.get_history("SSI", period="3mo")
+        
+        results = []
+        
+        def analyze_sym(symbol):
+            try:
+                df = MarketService.get_history(symbol, period="6mo")
+                if df is not None and not df.empty:
+                    df = SmartMoneyAnalyzer.analyze(df)
+                    if df is not None and not df.empty:
+                        last_row = df.iloc[-1]
+                        score_data = SmartMoneyAnalyzer.calc_leader_score(df, index_df=idx_df)
+                        
+                        return {
+                            'symbol': symbol,
+                            'price': last_row['Close'],
+                            'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2),
+                            'vol_ratio': round(last_row.get('Vol_Ratio', 0), 2),
+                            'rsi': round(last_row.get('RSI', 50), 1),
+                            'market_phase': df['Market_Phase'].iloc[-1],
+                            'action': df['Action_Recommendation'].iloc[-1],
+                            'signal_voteo': bool(last_row.get('Signal_VoTeo')),
+                            'signal_buydip': bool(last_row.get('Signal_BuyDip')),
+                            'signal_super': bool(last_row.get('Signal_Super')),
+                            'signal_breakout': bool(last_row.get('Signal_Breakout')),
+                            'signal_squeeze': bool(last_row.get('Signal_Squeeze')),
+                            'signal_distribution': bool(last_row.get('Signal_Distribution')),
+                            'signal_upbo': bool(last_row.get('Signal_Upbo')),
+                            'radar_panicsell': bool(last_row.get('Signal_PanicSell')),
+                            'radar_phankyam': bool(last_row.get('Signal_PhanKyAmMACD')),
+                            'radar_sangtay': bool(last_row.get('Signal_SangTayNhoLe')),
+                            'radar_daodong': bool(last_row.get('Signal_DaoDongLongLeo')),
+                            'radar_gaynen': bool(last_row.get('Signal_GayNenTestLai')),
+                            'radar_chammay': bool(last_row.get('Signal_ChamMayKenhDuoi')),
+                            'pyramid_action': SmartMoneyAnalyzer.get_pyramid_sizing(df),
+                            'base_distance_pct': df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0,
+                            'score': score_data.get('score', 0)
+                        }
+            except Exception as e:
+                logger.error(f"Error analyzing {symbol} during full scan: {e}")
+            return None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_symbol = {executor.submit(analyze_sym, sym): sym for sym in universe}
+            for future in concurrent.futures.as_completed(future_to_symbol):
+                res = future.result()
+                if res:
+                    results.append(res)
+
+        # Save to database
+        if results:
+            SQLUtils.save_market_analysis(results)
+            logger.info(f"Full market scan complete. Saved {len(results)} results.")
+        return results
