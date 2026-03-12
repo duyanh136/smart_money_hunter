@@ -796,6 +796,34 @@ async function processStopLoss() {
     const btn = event.target;
     const originalText = btn.innerText;
     btn.innerText = '⏳ Đang quét...';
+    try {
+        const res = await fetch('/api/stoploss_tool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ portfolio: smh_portfolio })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            data.data.forEach(updated => {
+                let p = smh_portfolio.find(i => i.symbol === updated.symbol);
+                if (p) {
+                    p.price = updated.price;
+                    p.pnl_percent = updated.pnl_percent;
+                    p.radar_alert = updated.radar_alert;
+                    p.action = updated.action;
+                }
+            });
+            savePortfolio();
+            renderStopLossTable();
+        }
+    } catch (e) {
+        console.error("Stoploss calculation failed", e);
+    } finally {
+        btn.innerText = originalText;
+    }
+}
+
 async function exportTopLeaders() {
     try {
         const res = await fetch('/api/top_leaders?limit=10');
@@ -838,15 +866,13 @@ async function exportTopLeaders() {
         ];
 
         let csvContent = "\uFEFF"; // Add BOM for Excel UTF-8 support
-        csvContent += columns.map(c => c.label).join('\t') + '\n'; // Use TAB for better compatibility with target format
+        csvContent += columns.map(c => c.label).join('\t') + '\n'; 
 
         csvContent += leaders.map(leader => {
             return columns.map(c => {
                 let val = leader[c.key];
                 if (val === undefined || val === null) return '';
-                // Handle booleans
                 if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
-                // Escape tabs/newlines in strings
                 if (typeof val === 'string') return val.replace(/\t/g, ' ').replace(/\n/g, ' ');
                 return val;
             }).join('\t');
@@ -872,37 +898,8 @@ async function exportTopLeaders() {
     }
 }
 
-// Initial Call to load leaders
-loadTopLeaders();
-
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ portfolio: smh_portfolio })
-        });
-        const data = await res.json();
-
-        if (data.status === 'success') {
-            data.data.forEach(updated => {
-                let p = smh_portfolio.find(i => i.symbol === updated.symbol);
-                if (p) {
-                    p.price = updated.price;
-                    p.pnl_percent = updated.pnl_percent;
-                    p.radar_alert = updated.radar_alert;
-                    p.action = updated.action;
-                }
-            });
-            savePortfolio();
-            renderStopLossTable();
-        }
-    } catch (e) {
-        console.error("Stoploss calculation failed", e);
-    } finally {
-        btn.innerText = originalText;
-    }
-}
-
 // Initial render for Stop Loss Table when opening or loading
 document.addEventListener('DOMContentLoaded', () => {
-    // Other loads...
     renderStopLossTable();
+    loadTopLeaders();
 });
