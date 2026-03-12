@@ -358,12 +358,78 @@ def check_portfolio_and_send_alert():
     except Exception as e:
         logger.error(f"Error sending Telegram message: {e}")
 
+def send_top10_alert():
+    """Fetches top 10 leaders and sends an alert to Telegram"""
+    logger.info("Fetching Top 10 Leaders for Telegram Alert...")
+    
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    
+    if not bot_token or not chat_id:
+        logger.warning("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set. Skipping Top 10 Alert.")
+        return
+
+    try:
+        leaders = MarketService.get_top_leaders(limit=10)
+        if not leaders:
+            logger.warning("No top leaders found for alert.")
+            return
+
+        now = datetime.now()
+        
+        # Format message
+        header = (
+            f"🏆 <b>DANH SÁCH TOP 10 SIÊU CỔ PHIẾU</b> 🏆\n"
+            f"<i>Cập nhật: {now.strftime('%H:%M %d/%m/%Y')}</i>\n\n"
+        )
+        
+        leader_msgs = []
+        for i, res in enumerate(leaders):
+            symbol = res['symbol']
+            score = res['score']
+            price = res['price']
+            change = res['change']
+            tag = res.get('tag', '')
+            
+            emoji = "🟢" if change >= 0 else "🔴"
+            sign = "+" if change >= 0 else ""
+            
+            # Rank and Score
+            msg = (
+                f"{i+1}. <b>{symbol}</b> ({tag})\n"
+                f"   💰 Giá: <b>{price:,.1f}</b> ({emoji} {sign}{change}%)\n"
+                f"   🚀 Leader Score: <b>{score:.1f}</b>"
+            )
+            leader_msgs.append(msg)
+            
+        footer = "\n\n💡 <i>Hệ thống tự động lọc theo Leader Score (Dòng tiền + Sức mạnh giá).</i>"
+        
+        final_message = header + "\n\n".join(leader_msgs) + footer
+        
+        # Send via Telegram API
+        telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": final_message,
+            "parse_mode": "HTML"
+        }
+        
+        resp = requests.post(telegram_url, json=payload, timeout=10)
+        if resp.status_code == 200:
+            logger.info("Top 10 Telegram alert sent successfully.")
+        else:
+            logger.error(f"Failed to send Top 10 alert: {resp.text}")
+            
+    except Exception as e:
+        logger.error(f"Error in send_top10_alert: {e}")
+
 def run_bot_scheduler():
     logger.info("Initializing Telegram Bot Scheduler & Cache...")
     init_portfolio_cache()
     
     # Schedule every 30 minutes
     schedule.every(30).minutes.do(check_portfolio_and_send_alert)
+    schedule.every(30).minutes.do(send_top10_alert)
     
     while True:
         schedule.run_pending()
