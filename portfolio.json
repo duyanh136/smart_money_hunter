@@ -5,5 +5,12 @@
         "volume": 200.0,
         "current_sl": 69133.5,
         "alert_sent": false
+    },
+    {
+        "symbol": "PVD",
+        "cost": 39609.0,
+        "volume": 300.0,
+        "current_sl": 35648.1,
+        "alert_sent": false
     }
 ]
