@@ -166,8 +166,14 @@
         <!-- Top 5 Leaders Dashboard -->
         <div class="top-leaders-container" id="top-leaders-container" style="display: none;">
             <div class="leaders-header">
-                <h2>🏆 BẢNG VÀNG: TOP 5 LÊN TÀU</h2>
-                <span class="leaders-subtitle">Máy quét Tự động - Cập nhật hàng ngày</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div>
+                        <h2>🏆 BẢNG VÀNG: TOP 5 LÊN TÀU</h2>
+                        <span class="leaders-subtitle">Máy quét Tự động - Cập nhật hàng ngày</span>
+                    </div>
+                    <button class="btn-primary" onclick="exportTopLeaders()" 
+                        style="background-color: #238636; border-color: #238636; width: auto; font-size: 13px;">📥 Xuất Top 10</button>
+                </div>
             </div>
             <div class="leaders-grid" id="leaders-grid">
                 <!-- Vị trí chèn Cổ Phiếu bằng JS -->
