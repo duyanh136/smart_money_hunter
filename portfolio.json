@@ -19,5 +19,12 @@
         "volume": 200.0,
         "current_sl": 59850.0,
         "alert_sent": false
+    },
+    {
+        "symbol": "VCI",
+        "cost": 36555.0,
+        "volume": 400.0,
+        "current_sl": 32899.5,
+        "alert_sent": false
     }
 ]
