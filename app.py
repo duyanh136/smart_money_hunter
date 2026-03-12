@@ -11,7 +11,7 @@ if sys.stderr.encoding != 'utf-8':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 from flask import Flask, render_template, jsonify, request
 from concurrent.futures import ThreadPoolExecutor
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask_socketio import SocketIO, emit
 import logging
 from services.market_service import MarketService
@@ -19,6 +19,7 @@ from services.smart_money import SmartMoneyAnalyzer
 from services.tcbs_service import tcbs_service
 from services.tcbs_socket import tcbs_stream
 from services.telegram_bot import run_bot_scheduler, check_realtime_stoploss, load_portfolio, reload_telegram_bot_cache
+from services.sql_utils import SQLUtils
 import threading
 import pandas as pd
 import json
@@ -99,15 +100,21 @@ def get_history_data():
             'base_distance_pct': row['Base_Distance_Pct'] if 'Base_Distance_Pct' in row else 0
         })
         
+    # Try to get pre-computed analysis from SQL to save time
+    cached = SQLUtils.get_analysis_by_symbol(symbol)
+
     return jsonify({
         'symbol': symbol,
         'group': class_info['group'],
         'strategy': class_info['strategy'],
-        'market_phase': df['Market_Phase'].iloc[-1] if 'Market_Phase' in df else "N/A", # Global Phase (Current)
-        'action': df['Action_Recommendation'].iloc[-1] if 'Action_Recommendation' in df else "N/A",
+        'market_phase': (cached['MarketPhase'] if cached else (df['Market_Phase'].iloc[-1] if 'Market_Phase' in df else "N/A")),
+        'action': (cached['ActionRecommendation'] if cached else (df['Action_Recommendation'].iloc[-1] if 'Action_Recommendation' in df else "N/A")),
         'poc': df['POC'].iloc[-1] if 'POC' in df else 0,
-        'pyramid_action': SmartMoneyAnalyzer.get_pyramid_sizing(df),
-        'base_distance_pct': df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0,
+        'pyramid_action': cached['PyramidAction'] if cached else SmartMoneyAnalyzer.get_pyramid_sizing(df),
+        'base_distance_pct': cached['BaseDistancePct'] if cached else (df['Base_Distance_Pct'].iloc[-1] if 'Base_Distance_Pct' in df else 0),
+        'is_shark_dominated': cached['IsSharkDominated'] if cached else False,
+        'is_storm_resistant': cached['IsStormResistant'] if cached else False,
+        'buy_signal_status': cached['BuySignalStatus'] if cached else SmartMoneyAnalyzer.get_buy_signal_status(df),
         'data': result
     })
 
@@ -132,6 +139,18 @@ def get_top_leaders():
         return jsonify(leaders)
     except Exception as e:
         logger.error(f"API top_leaders error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/top_leaders_history')
+def get_top_leaders_history():
+    date_str = request.args.get('date')
+    if not date_str:
+        return jsonify({'error': 'Missing date parameter'}), 400
+    try:
+        history = SQLUtils.get_top_leaders_history(date_str)
+        return jsonify(history)
+    except Exception as e:
+        logger.error(f"API top_leaders_history error: {e}")
         return jsonify({'error': str(e)}), 500
 
 # Global Watchlist
@@ -306,100 +325,71 @@ def stoploss_tool():
                 
     return jsonify({"status": "success", "data": results})
 
-@app.route('/api/scan')
+@app.route('/api/scan', methods=['GET'])
+@cross_origin()
 def scan_market():
-    results = []
-    
-    # Use ThreadPool to scan in parallel
-    # We can scan all or limit
-    
-    def scan_symbol(symbol):
-        try:
-            # Get latest price from socket if available to skip REST call?
-            # No, we need full history for analysis (Signals)
-            # Get history
-            df = MarketService.get_history(symbol, period='6mo')
+    """
+    Scans market.
+    Vercel Mode (Cloud): Fast DB lookup to avoid 10s timeout crash.
+    Local Mode: Real-time scan as requested by user.
+    """
+    try:
+        results = []
+        if IS_VERCEL:
+            # Use high-speed DB lookup for Vercel stability
+            logger.info("Vercel Mode: Fetching analysis from SQL Database (High Speed)...")
+            results = SQLUtils.get_all_market_analysis()
+            if not results:
+                 logger.warning("Vercel Mode: SQL Database is empty. Returning empty list.")
+        else:
+            # Full Real-time scan for Local environment (no 10s timeout)
+            logger.info("Local Mode: Performing full real-time market scan...")
+            results = MarketService.run_full_market_scan(save_history=False)
             
-            if df is not None and not df.empty:
-                df = SmartMoneyAnalyzer.analyze(df)
-                if df is not None and not df.empty:
-                    last_row = df.iloc[-1]
-                    
-                    return {
-                        'symbol': symbol,
-                        'price': last_row['Close'],
-                        'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2),
-                        'vol_ratio': round(last_row['Vol_Ratio'], 2),
-                        'rsi': round(last_row['RSI'], 1),
-                        'market_phase': df['Market_Phase'].iloc[-1],
-                        'action': df['Action_Recommendation'].iloc[-1],
-                        # Signals
-                        'signal_voteo': bool(last_row.get('Signal_VoTeo')),
-                        'signal_buydip': bool(last_row.get('Signal_BuyDip')),
-                        'signal_breakout': bool(last_row.get('Signal_Breakout')),
-                        'signal_goldensell': bool(last_row.get('Signal_GoldenSell')),
-                        'signal_warning': bool(last_row.get('Signal_Distribution') or last_row.get('Signal_UpBo')),
-                        # Radar Signals
-                        'radar_panicsell': bool(last_row.get('Signal_PanicSell')),
-                        'radar_sangtay': bool(last_row.get('Signal_SangTayNhoLe')),
-                        'radar_gaynen': bool(last_row.get('Signal_GayNenTestLai')),
-                        'radar_phankyam': bool(last_row.get('Signal_PhanKyAmMACD')),
-                        'radar_daodong': bool(last_row.get('Signal_DaoDongLongLeo')),
-                        'radar_chammay': bool(last_row.get('Signal_ChamMayKenhDuoi')),
-                        'pyramid_action': SmartMoneyAnalyzer.get_pyramid_sizing(df),
-                        'base_distance_pct': round(last_row.get('Base_Distance_Pct', 0), 2)
-                    }
-                    
-            # Fallback for stocks with no history (e.g. TCBS API broken for UPCOM)
-            # Try to get snapshot info to at least show Price
-            info = tcbs_service.get_ticker_info(symbol)
-            if info:
-                # { 'price': x, 'refPrice': y, 'volume': z, ... }
-                curr_price = info.get('price') or info.get('refPrice') or 0
-                ref_price = info.get('refPrice') or curr_price
-                change = 0
-                if ref_price > 0:
-                    change = round((curr_price - ref_price) / ref_price * 100, 2)
-                    
-                return {
-                    'symbol': symbol,
-                    'price': curr_price,
-                    'change': change,
-                    'vol_ratio': 0,
-                    'rsi': 0,
-                    'market_phase': "Không có lịch sử",
-                    'action': "Chỉ báo giá (N/A)",
-                    # Signals all False
-                    'signal_voteo': False,
-                    'signal_buydip': False,
-                    'signal_breakout': False,
-                    'signal_goldensell': False,
-                    'signal_warning': False,
-                    # Radar Signals
-                    'radar_panicsell': False,
-                    'radar_sangtay': False,
-                    'radar_phankyam': False,
-                    'radar_daodong': False,
-                    'radar_chammay': False,
-                    'pyramid_action': "N/A",
-                    'base_distance_pct': 0
-                }
+            if not results:
+                # Fallback to last known SQL state if real-time fails locally
+                logger.warning("Local Mode: Real-time scan failed, falling back to SQL.")
+                results = SQLUtils.get_all_market_analysis()
 
-        except Exception as e:
-            logger.error(f"Scan error {symbol}: {e}")
-        return None
-
-    # Limit max workers to avoid overload
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        # Check first 30 for now to be fast, or all?
-        # User wants FAST.
-        # Let's scan all but rely on cache in MarketService
-        futures = executor.map(scan_symbol, WATCHLIST)
-        for res in futures:
-            if res:
-                results.append(res)
-    
-    return jsonify(results)
+        # Consistent mapping for both Cloud and Local data
+        mapped_results = []
+        for r in results:
+            # Normalizing fields: database vs in-memory dict
+            mapped_results.append({
+                'symbol': r.get('symbol') or r.get('Symbol'),
+                'price': r.get('price') or r.get('Price'),
+                'change': r.get('change') or r.get('ChangePct'),
+                'vol_ratio': r.get('vol_ratio') or r.get('VolRatio'),
+                'rsi': r.get('rsi') or r.get('RSI'),
+                'market_phase': r.get('market_phase') or r.get('MarketPhase'),
+                'action': r.get('action') or r.get('ActionRecommendation'),
+                'signal_voteo': bool(r.get('signal_voteo') or r.get('SignalVoTeo')),
+                'signal_buydip': bool(r.get('signal_buydip') or r.get('SignalBuyDip')),
+                'signal_super': bool(r.get('signal_super') or r.get('SignalSuper')),
+                'signal_breakout': bool(r.get('signal_breakout') or r.get('SignalBreakout')),
+                'signal_squeeze': bool(r.get('signal_squeeze') or r.get('SignalSqueeze')),
+                'signal_distribution': bool(r.get('signal_distribution') or r.get('SignalDistribution')),
+                'signal_upbo': bool(r.get('signal_upbo') or r.get('SignalUpbo')),
+                'signal_goldensell': bool(r.get('signal_goldensell') or r.get('SignalGoldenSell')),
+                'signal_bigmoney': bool(r.get('signal_bigmoney') or r.get('SignalBigMoney')),
+                'radar_panicsell': bool(r.get('radar_panicsell') or r.get('RadarPanicSell')),
+                'radar_phankyam': bool(r.get('radar_phankyam') or r.get('RadarPhanKyAm')),
+                'radar_sangtay': bool(r.get('radar_sangtay') or r.get('RadarSangTay')),
+                'radar_daodong': bool(r.get('radar_daodong') or r.get('RadarDaoDong')),
+                'radar_gaynen': bool(r.get('radar_gaynen') or r.get('RadarGayNen')),
+                'radar_chammay': bool(r.get('radar_chammay') or r.get('RadarChamMay')),
+                'pyramid_action': r.get('pyramid_action') or r.get('PyramidAction'),
+                'base_distance_pct': r.get('base_distance_pct') or r.get('BaseDistancePct'),
+                'is_shark_dominated': bool(r.get('is_shark_dominated') or r.get('IsSharkDominated')),
+                'is_storm_resistant': bool(r.get('is_storm_resistant') or r.get('IsStormResistant')),
+                'rank': r.get('rank') or r.get('Rank'),
+                'buy_signal_status': r.get('buy_signal_status') or r.get('BuySignalStatus', 'N/A')
+            })
+            
+        return jsonify(mapped_results)
+    except Exception as e:
+        logger.error(f"Error in /api/scan (Emergency Fix Mode): {e}")
+        return jsonify([])
 
 if __name__ == '__main__':
     logger.info("Starting Smart Money Hunter (Flask)...")

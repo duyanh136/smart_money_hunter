@@ -19,6 +19,7 @@ def setup_tables():
         conn = pyodbc.connect(conn_str, timeout=10)
         cursor = conn.cursor()
         print("Connected successfully!")
+        
         # Drop existing tables to ensure clean slate
         print("Dropping existing tables...")
         cursor.execute("IF OBJECT_ID('[dbo].[MarketAnalysis]', 'U') IS NOT NULL DROP TABLE [dbo].[MarketAnalysis]")
@@ -27,57 +28,68 @@ def setup_tables():
         # Create MarketAnalysis table
         print("Creating table [dbo].[MarketAnalysis]...")
         cursor.execute("""
-        CREATE TABLE [dbo].[MarketAnalysis] (
-            [Symbol] VARCHAR(20) PRIMARY KEY,
-            [Price] FLOAT,
-            [Change] FLOAT,
-            [VolRatio] FLOAT,
-            [RSI] FLOAT,
-            [MarketPhase] NVARCHAR(100),
-            [Action] NVARCHAR(100),
-            [LeaderScore] INT,
-            [IsSharkDominated] BIT,
-            [IsStormResistant] BIT,
-            [Tag] NVARCHAR(200),
-            [SignalVoTeo] BIT,
-            [SignalBuyDip] BIT,
-            [SignalBreakout] BIT,
-            [SignalGoldenSell] BIT,
-            [SignalWarning] BIT,
-            [RadarPanicSell] BIT,
-            [RadarSangTay] BIT,
-            [RadarGayNen] BIT,
-            [RadarPhanKyAm] BIT,
-            [RadarDaoDong] BIT,
-            [RadarChamMay] BIT,
-            [PyramidAction] NVARCHAR(100),
-            [BaseDistancePct] FLOAT,
-            [LastUpdated] DATETIME DEFAULT GETDATE()
-        )
+            CREATE TABLE [dbo].[MarketAnalysis] (
+                [Symbol] VARCHAR(20) PRIMARY KEY,
+                [Price] DECIMAL(18, 2),
+                [ChangePct] DECIMAL(18, 2),
+                [VolRatio] DECIMAL(18, 2),
+                [RSI] DECIMAL(18, 2),
+                [MarketPhase] NVARCHAR(100),
+                [ActionRecommendation] NVARCHAR(100),
+                [LeaderScore] DECIMAL(18, 2),
+                [IsSharkDominated] BIT,
+                [IsStormResistant] BIT,
+                [Tag] NVARCHAR(100),
+                [SignalVoTeo] BIT,
+                [SignalBuyDip] BIT,
+                [SignalBreakout] BIT,
+                [SignalGoldenSell] BIT,
+                [SignalWarning] BIT,
+                [RadarPanicSell] BIT,
+                [RadarSangTay] BIT,
+                [RadarGayNen] BIT,
+                [RadarPhanKyAm] BIT,
+                [RadarDaoDong] BIT,
+                [RadarChamMay] BIT,
+                [PyramidAction] NVARCHAR(100),
+                [BaseDistancePct] DECIMAL(18, 2),
+                [Rank] INT,
+                [BuySignalStatus] NVARCHAR(100),
+                [UpdatedAt] DATETIME DEFAULT GETDATE()
+            )
         """)
-        
+
         # Create MarketAnalysisHistory table
         print("Creating table [dbo].[MarketAnalysisHistory]...")
         cursor.execute("""
-        CREATE TABLE [dbo].[MarketAnalysisHistory] (
-            [Id] INT IDENTITY(1,1) PRIMARY KEY,
-            [Symbol] VARCHAR(20),
-            [Price] FLOAT,
-            [Change] FLOAT,
-            [VolRatio] FLOAT,
-            [RSI] FLOAT,
-            [MarketPhase] NVARCHAR(100),
-            [Action] NVARCHAR(100),
-            [LeaderScore] INT,
-            [IsSharkDominated] BIT,
-            [IsStormResistant] BIT,
-            [SignalVoTeo] BIT,
-            [SignalBuyDip] BIT,
-            [SignalBreakout] BIT,
-            [SignalGoldenSell] BIT,
-            [SignalWarning] BIT,
-            [AnalysisDate] DATETIME DEFAULT GETDATE()
-        )
+            CREATE TABLE [dbo].[MarketAnalysisHistory] (
+                [Id] INT IDENTITY(1,1) PRIMARY KEY,
+                [Symbol] VARCHAR(20),
+                [AnalysisDate] DATE,
+                [Price] DECIMAL(18, 2),
+                [ChangePct] DECIMAL(18, 2),
+                [VolRatio] DECIMAL(18, 2),
+                [RSI] DECIMAL(18, 2),
+                [MarketPhase] NVARCHAR(100),
+                [ActionRecommendation] NVARCHAR(100),
+                [LeaderScore] DECIMAL(18, 2),
+                [Rank] INT,
+                [BuySignalStatus] NVARCHAR(100),
+                [IsSharkDominated] BIT,
+                [IsStormResistant] BIT,
+                [SignalVoTeo] BIT,
+                [SignalBuyDip] BIT,
+                [SignalBreakout] BIT,
+                [SignalGoldenSell] BIT,
+                [SignalWarning] BIT,
+                [RadarPanicSell] BIT,
+                [RadarSangTay] BIT,
+                [RadarGayNen] BIT,
+                [RadarPhanKyAm] BIT,
+                [RadarDaoDong] BIT,
+                [RadarChamMay] BIT,
+                [CreatedAt] DATETIME DEFAULT GETDATE()
+            )
         """)
         
         conn.commit()

@@ -1,8 +1,13 @@
 // Main JS
+const isVercel = window.location.hostname.includes('vercel.app');
+
 const socket = io({
-    transports: ['websocket', 'polling'],
-    upgrade: true
+    transports: isVercel ? ['polling'] : ['websocket', 'polling'], // Faster fallback on Vercel
+    upgrade: !isVercel,
+    reconnectionAttempts: 3,
+    timeout: 10000
 });
+
 let priceChart, flowChart, rsiChart, macdChart;
 let candleSeries, pocSeries, sharkSeries, retailSeries;
 let rsiSeries, macdLineSeries, macdSignalSeries, macdHistSeries, ma20Series, ma50Series;
@@ -12,11 +17,15 @@ let currentPeriod = '1y';
 let lastScanResults = []; // Cache for filtering
 
 document.addEventListener('DOMContentLoaded', () => {
-    initCharts();
-    loadSymbols();
-    loadData(currentSymbol);
-    loadMarketHealth(); // Fetch market weather & health
-    loadTopLeaders(); // Fetch Top 5 Leaders
+    try {
+        initCharts();
+        loadSymbols();
+        loadData(currentSymbol);
+        loadMarketHealth(); // Fetch market weather & health
+        loadTopLeaders(); // Fetch Top 5 Leaders
+    } catch (err) {
+        console.error("Initialization error:", err);
+    }
 
     // Setup Toast Container
     if (!document.getElementById('toast-container')) {
@@ -26,14 +35,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Event Listeners
-    document.getElementById('symbol-input').addEventListener('change', (e) => {
-        currentSymbol = e.target.value.toUpperCase();
-        loadData(currentSymbol);
-    });
+    const symbolInput = document.getElementById('symbol-input');
+    if (symbolInput) {
+        symbolInput.addEventListener('change', (e) => {
+            currentSymbol = e.target.value.toUpperCase();
+            loadData(currentSymbol);
+        });
+    }
 
     // --- WebSocket Socket.IO ---
     socket.on('connect', () => {
         console.log("Connected to server");
+    });
+
+    socket.on('connect_error', (err) => {
+        console.warn("Socket.IO connection error (expected on Vercel):", err.message);
+        if (isVercel) socket.disconnect(); // Don't spam on Vercel
     });
 
     socket.on('server_status', (data) => {
@@ -46,21 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceEl = document.getElementById('current-price');
             if (priceEl && data.price) {
                 priceEl.innerText = parseFloat(data.price).toFixed(2);
-                // Simple nudge/flash effect
                 priceEl.style.color = '#e6b800';
                 setTimeout(() => priceEl.style.color = '#fff', 500);
             }
 
-            // Update Volume if present
             if (data.vol) {
                 const volEl = document.getElementById('current-vol');
                 if (volEl) volEl.innerText = new Intl.NumberFormat('en-US').format(data.vol);
             }
-
-            // Real-time chart update (Daily candle)
-            // We assume the update is for the CURRENT day (last bar)
-            // Ideally we'd compare data.time with the last bar time.
-            // For now, let's just update the UI price.
         }
     });
 });
@@ -273,10 +283,33 @@ async function loadData(symbol, period = '1y') {
             return;
         }
 
-        // Update UI Info
+        // Update Stock Info Metadata
         document.getElementById('stock-symbol').innerText = data.symbol;
         document.getElementById('stock-group').innerText = data.group;
-        document.getElementById('strategy-text').innerText = data.strategy;
+        document.getElementById('stock-strategy').innerText = data.strategy;
+        document.getElementById('stock-phase').innerText = data.market_phase;
+        document.getElementById('stock-action').innerText = data.action;
+        document.getElementById('stock-base').innerText = `${data.base_distance_pct}% (Độ thắt chặt)`;
+
+        // --- NEW: Update Badges & Vietnamese Buy Signal Status ---
+        const badgeContainer = document.getElementById('badges-container');
+        if (badgeContainer) {
+            badgeContainer.innerHTML = '';
+            if (data.is_shark_dominated) {
+                badgeContainer.innerHTML += '<span class="badge badge-shark">💎 Tiền Lớn</span>';
+            }
+            if (data.is_storm_resistant) {
+                badgeContainer.innerHTML += '<span class="badge badge-storm">🛡️ Kháng Bão</span>';
+            }
+        }
+        
+        const signalStatusEl = document.getElementById('buy-signal-status');
+        if (signalStatusEl) {
+            signalStatusEl.innerText = data.buy_signal_status || "Quan Sát / Chờ Điểm Mua";
+            if (data.buy_signal_status === "🚨 BÁO ĐỘNG MÚC") signalStatusEl.style.color = '#4CAF50';
+            else if (data.buy_signal_status === "🛑 CẤM ĐU XANH TÍM") signalStatusEl.style.color = '#ff6b6b';
+            else signalStatusEl.style.color = '#e4e6eb';
+        }
 
         // Update Volume Info
         const last = data.data[data.data.length - 1];
