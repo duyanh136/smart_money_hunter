@@ -13,3 +13,4 @@ schedule
 pymssql
 pyodbc
 watchdog
+openpyxl

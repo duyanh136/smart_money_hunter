@@ -1,23 +1,9 @@
 [
     {
-        "symbol": "POW",
-        "cost": 14221.0,
-        "volume": 100.0,
-        "current_sl": 12798.9,
-        "alert_sent": false
-    },
-    {
-        "symbol": "GVR",
-        "cost": 40661.0,
-        "volume": 100.0,
-        "current_sl": 36594.9,
-        "alert_sent": false
-    },
-    {
-        "symbol": "HPG",
-        "cost": 27970.0,
-        "volume": 100.0,
-        "current_sl": 25173.0,
+        "symbol": "GMD",
+        "cost": 76815.0,
+        "volume": 200.0,
+        "current_sl": 69133.5,
         "alert_sent": false
     }
 ]
