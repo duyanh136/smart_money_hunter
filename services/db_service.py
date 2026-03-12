@@ -53,6 +53,21 @@ class DBService:
             logger.error(f"Failed to save Top Leaders to SQLite: {e}")
 
     @staticmethod
+    def take_snapshot():
+        """Automatically fetch current top leaders and save to SQLite."""
+        from services.market_service import MarketService
+        try:
+            logger.info("Auto-Snapshot: Running daily Top 5 Leaders scan...")
+            leaders = MarketService.get_top_leaders(limit=10)
+            if leaders:
+                DBService.save_top_leaders(leaders)
+                logger.info(f"Auto-Snapshot: Successfully saved {len(leaders)} leaders.")
+            else:
+                logger.warning("Auto-Snapshot: No leaders found to save.")
+        except Exception as e:
+            logger.error(f"Auto-Snapshot failed: {e}")
+
+    @staticmethod
     def get_history_by_date(date_str):
         """Retrieve historical top leaders for a specific date."""
         try:
