@@ -19,7 +19,11 @@ from services.smart_money import SmartMoneyAnalyzer
 from services.tcbs_service import tcbs_service
 from services.tcbs_socket import tcbs_stream
 from services.telegram_bot import run_bot_scheduler, check_realtime_stoploss, load_portfolio, reload_telegram_bot_cache
+<<<<<<< HEAD
 from services.sql_utils import SQLUtils
+=======
+from services.db_service import DBService
+>>>>>>> de543b0 (Auto-sync: 2026-03-12 13:46:12)
 import threading
 import pandas as pd
 import json
@@ -136,6 +140,11 @@ def get_top_leaders():
     try:
         limit = int(request.args.get('limit', 10))
         leaders = MarketService.get_top_leaders(limit=limit)
+        
+        # Save to SQLite for history (only for default limit or if not on Vercel)
+        if limit >= 5 and not IS_VERCEL:
+            DBService.save_top_leaders(leaders)
+            
         return jsonify(leaders)
     except Exception as e:
         logger.error(f"API top_leaders error: {e}")
@@ -145,6 +154,7 @@ def get_top_leaders():
 def get_top_leaders_history():
     date_str = request.args.get('date')
     if not date_str:
+<<<<<<< HEAD
         return jsonify({'error': 'Missing date parameter'}), 400
     try:
         history = SQLUtils.get_top_leaders_history(date_str)
@@ -152,6 +162,20 @@ def get_top_leaders_history():
     except Exception as e:
         logger.error(f"API top_leaders_history error: {e}")
         return jsonify({'error': str(e)}), 500
+=======
+        return jsonify({'error': 'Date is required'}), 400
+    
+    leaders = DBService.get_history_by_date(date_str)
+    if leaders:
+        return jsonify(leaders)
+    else:
+        return jsonify({'error': 'No data for this date'}), 404
+
+@app.route('/api/top_leaders_dates')
+def get_top_leaders_dates():
+    dates = DBService.get_available_dates()
+    return jsonify(dates)
+>>>>>>> de543b0 (Auto-sync: 2026-03-12 13:46:12)
 
 # Global Watchlist
 WATCHLIST = [
