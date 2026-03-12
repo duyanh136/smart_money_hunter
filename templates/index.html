@@ -166,6 +166,7 @@
         <!-- Top 5 Leaders Dashboard -->
         <div class="top-leaders-container" id="top-leaders-container" style="display: none;">
             <div class="leaders-header">
+<<<<<<< HEAD
                 <h2>🏆 BẢNG VÀNG: TOP 10 LÊN TÀU</h2>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <input type="date" id="leaders-history-date" 
@@ -174,6 +175,20 @@
                     <button onclick="loadTopLeaders()" class="btn-filter" style="margin: 0;">Hiện tại</button>
                 </div>
                 <span class="leaders-subtitle">Máy quét Tự động - Cập nhật 16:00 mỗi ngày</span>
+=======
+                <h2>🏆 BẢNG VÀNG: TOP 5 LÊN TÀU</h2>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="leaders-subtitle">Máy quét Tự động - Cập nhật hàng ngày</span>
+                    <div id="history-controls" style="display: flex; align-items: center; gap: 5px; margin-left: 15px;">
+                        <button class="btn-filter" id="btn-show-history" onclick="toggleHistory()" 
+                                style="font-size: 0.8em; padding: 2px 8px; border-color: #f9c513; color: #f9c513;">🕒 Lịch sử</button>
+                        <select id="history-date-select" onchange="loadLeaderHistory()" 
+                                style="display: none; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 4px; padding: 2px 5px; font-size: 0.85em;">
+                            <option value="">Chọn ngày...</option>
+                        </select>
+                    </div>
+                </div>
+>>>>>>> f2b3129 (Auto-sync: 2026-03-12 13:46:23)
             </div>
             <div class="leaders-grid" id="leaders-grid">
                 <!-- Vị trí chèn Cổ Phiếu bằng JS -->
