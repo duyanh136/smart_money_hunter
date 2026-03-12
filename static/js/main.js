@@ -483,50 +483,106 @@ async function loadTopLeaders() {
         if (container) container.style.display = 'block';
         if (grid) grid.innerHTML = '';
 
-        leaders.forEach((leader, index) => {
-            const changeClass = leader.change >= 0 ? 'positive' : 'negative';
-            const sign = leader.change > 0 ? '+' : '';
-
-            // Format tag safely
-            let tagHtml = leader.tag || "🔥 Siêu cổ / Leader";
-            // Replace newlines or make it compact if needed
-
-            let badgesHtml = '';
-            if (leader.is_shark_dominated) {
-                badgesHtml += '<span class="badge" style="font-size:0.65rem; padding: 2px 4px; background: #238636; color: white; border-radius: 4px; margin-right: 4px;" title="Cá mập gom mạnh, nhỏ lẻ thoát hàng">💎 Tiền Lớn</span>';
-            }
-            if (leader.is_storm_resistant) {
-                badgesHtml += '<span class="badge" style="font-size:0.65rem; padding: 2px 4px; background: #9e6a03; color: white; border-radius: 4px; margin-right: 4px;" title="Cổ phiếu trơ với nhịp sập của VN-Index">🛡️ Kháng Bão</span>';
-            }
-
-            if (badgesHtml) {
-                tagHtml = '<div style="margin-bottom: 4px;">' + badgesHtml + '</div>' + tagHtml;
-            }
-
-            const cardHtml = `
-                <div class="leader-card" onclick="loadData('${leader.symbol}')">
-                    <div class="leader-symbol">
-                        <span>${leader.symbol}</span>
-                        <span class="leader-score">Top ${index + 1} (${leader.score}đ)</span>
-                    </div>
-                    <div class="leader-tag" style="line-height: 1.4;">${tagHtml}</div>
-                    
-                    <div class="leader-price-row">
-                        <span class="leader-price">${new Intl.NumberFormat('en-US').format(leader.price)}</span>
-                        <span class="leader-change ${changeClass}">${sign}${leader.change}%</span>
-                    </div>
-                    
-                    <div class="leader-actions">
-                        <button class="btn-buy-leader" onclick="event.stopPropagation(); handleLeaderAction('BUY', '${leader.symbol}', ${leader.price}, ${leader.signal_buydip}, ${leader.rsi})">MUA</button>
-                        <button class="btn-sell-leader" onclick="event.stopPropagation(); handleLeaderAction('SELL', '${leader.symbol}', ${leader.price}, false, 0)">BÁN</button>
-                    </div>
-                </div>
-            `;
-            grid.innerHTML += cardHtml;
-        });
+        renderLeadersGrid(leaders);
 
     } catch (e) {
         console.error("Top Leaders Error", e);
+    }
+}
+
+function renderLeadersGrid(leaders) {
+    const grid = document.getElementById('leaders-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    leaders.forEach((leader, index) => {
+        const changeClass = leader.change >= 0 ? 'positive' : 'negative';
+        const sign = leader.change > 0 ? '+' : '';
+
+        // Format tag safely
+        let tagHtml = leader.tag || "🔥 Siêu cổ / Leader";
+
+        let badgesHtml = '';
+        if (leader.is_shark_dominated) {
+            badgesHtml += '<span class="badge" style="font-size:0.65rem; padding: 2px 4px; background: #238636; color: white; border-radius: 4px; margin-right: 4px;" title="Cá mập gom mạnh, nhỏ lẻ thoát hàng">💎 Tiền Lớn</span>';
+        }
+        if (leader.is_storm_resistant) {
+            badgesHtml += '<span class="badge" style="font-size:0.65rem; padding: 2px 4px; background: #9e6a03; color: white; border-radius: 4px; margin-right: 4px;" title="Cổ phiếu trơ với nhịp sập của VN-Index">🛡️ Kháng Bão</span>';
+        }
+
+        if (badgesHtml) {
+            tagHtml = '<div style="margin-bottom: 4px;">' + badgesHtml + '</div>' + tagHtml;
+        }
+
+        const cardHtml = `
+            <div class="leader-card" onclick="loadData('${leader.symbol}')">
+                <div class="leader-symbol">
+                    <span>${leader.symbol}</span>
+                    <span class="leader-score">Top ${index + 1} (${leader.score}đ)</span>
+                </div>
+                <div class="leader-tag" style="line-height: 1.4;">${tagHtml}</div>
+                
+                <div class="leader-price-row">
+                    <span class="leader-price">${new Intl.NumberFormat('en-US').format(leader.price)}</span>
+                    <span class="leader-change ${changeClass}">${sign}${leader.change}%</span>
+                </div>
+                
+                <div class="leader-actions">
+                    <button class="btn-buy-leader" onclick="event.stopPropagation(); handleLeaderAction('BUY', '${leader.symbol}', ${leader.price}, ${leader.signal_buydip}, ${leader.rsi})">MUA</button>
+                    <button class="btn-sell-leader" onclick="event.stopPropagation(); handleLeaderAction('SELL', '${leader.symbol}', ${leader.price}, false, 0)">BÁN</button>
+                </div>
+            </div>
+        `;
+        grid.innerHTML += cardHtml;
+    });
+}
+
+async function toggleHistory() {
+    const select = document.getElementById('history-date-select');
+    const btn = document.getElementById('btn-show-history');
+    
+    if (select.style.display === 'none') {
+        // Show select, load dates
+        select.style.display = 'inline-block';
+        btn.innerText = '🔙 Hiện tại';
+        btn.style.borderColor = '#30363d';
+        btn.style.color = '#fff';
+        
+        const res = await fetch('/api/top_leaders_dates');
+        const dates = await res.json();
+        
+        select.innerHTML = '<option value="">Chọn ngày...</option>';
+        dates.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d;
+            opt.innerText = d;
+            select.appendChild(opt);
+        });
+    } else {
+        // Hide select, back to current
+        select.style.display = 'none';
+        btn.innerText = '🕒 Lịch sử';
+        btn.style.borderColor = '#f9c513';
+        btn.style.color = '#f9c513';
+        loadTopLeaders();
+    }
+}
+
+async function loadLeaderHistory() {
+    const date = document.getElementById('history-date-select').value;
+    if (!date) return;
+    
+    try {
+        const res = await fetch(`/api/top_leaders_history?date=${date}`);
+        const leaders = await res.json();
+        
+        if (leaders && !leaders.error) {
+            renderLeadersGrid(leaders);
+        } else {
+            alert('Không có dữ liệu cho ngày này.');
+        }
+    } catch (e) {
+        console.error("Load leader history error", e);
     }
 }
 
