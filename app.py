@@ -111,6 +111,85 @@ def get_history_data():
         'data': result
     })
 
+@app.route('/api/export_excel')
+def export_excel():
+    try:
+        limit = int(request.args.get('limit', 10))
+        leaders = MarketService.get_top_leaders(limit=limit)
+        
+        if not leaders:
+            return jsonify({'error': 'No data'}), 404
+            
+        df = pd.DataFrame(leaders)
+        
+        # Define readable headers and column order
+        cols_mapping = {
+            'symbol': 'Symbol', 'price': 'Price', 'change': 'ChangePct', 'vol_ratio': 'VolRatio',
+            'rsi': 'RSI', 'market_phase': 'MarketPhase', 'action': 'ActionRecommendation',
+            'score': 'LeaderScore', 'is_shark_dominated': 'IsSharkDominated',
+            'is_storm_resistant': 'IsStormResistant', 'tag': 'Tag', 'signal_voteo': 'SignalVoTeo',
+            'signal_buydip': 'SignalBuyDip', 'signal_breakout': 'SignalBreakout',
+            'signal_goldensell': 'SignalGoldenSell', 'signal_warning': 'SignalWarning',
+            'radar_panicsell': 'RadarPanicSell', 'radar_sangtay': 'RadarSangTay',
+            'radar_gaynen': 'RadarGayNen', 'radar_phankyam': 'RadarPhanKyAm',
+            'radar_daodong': 'RadarDaoDong', 'radar_chammay': 'RadarChamMay',
+            'pyramid_action': 'PyramidAction', 'base_distance_pct': 'BaseDistancePct',
+            'rank': 'Rank', 'buy_signal_status': 'BuySignalStatus', 'updated_at': 'UpdatedAt'
+        }
+        
+        # Filter for existing columns and rename
+        existing_cols = [c for c in cols_mapping.keys() if c in df.columns]
+        df = df[existing_cols]
+        df.rename(columns=cols_mapping, inplace=True)
+        
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Top Leaders')
+            
+            # Formatting
+            workbook = writer.book
+            worksheet = writer.sheets['Top Leaders']
+            
+            from openpyxl.styles import Font, Alignment, PatternFill
+            
+            header_fill = PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')
+            header_font = Font(color='FFFFFF', bold=True)
+            alignment = Alignment(horizontal='center', vertical='center')
+            
+            # Header styling
+            for cell in worksheet[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = alignment
+                
+            # Auto-adjust column widths
+            for column_cells in worksheet.columns:
+                max_length = 0
+                column = column_cells[0].column_letter
+                for cell in column_cells:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                worksheet.column_dimensions[column].width = adjusted_width
+
+        output.seek(0)
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        filename = f"SmartMoney_Top10_{timestamp}.xlsx"
+        
+        from flask import send_file
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        logger.error(f"Excel Export Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 from services.symbol_loader import SymbolLoader
 import concurrent.futures
 
