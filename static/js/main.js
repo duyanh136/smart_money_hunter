@@ -839,16 +839,23 @@ function renderStopLossTable() {
 
     smh_portfolio.forEach((item, index) => {
         let holdingDays = '-';
+        let formattedDate = '-';
         if (item.buy_date) {
             const buyDate = new Date(item.buy_date);
             const today = new Date();
             const diffTime = Math.abs(today - buyDate);
             holdingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            // Format dd/mm/yyyy
+            const d = buyDate.getDate().toString().padStart(2, '0');
+            const m = (buyDate.getMonth() + 1).toString().padStart(2, '0');
+            const y = buyDate.getFullYear();
+            formattedDate = `${d}/${m}/${y}`;
         }
 
         const row = `<tr>
             <td style="font-weight:bold; text-align: left; color:#a5d6ff;">${item.symbol}</td>
-            <td style="font-size: 0.85em; color: #8b949e;">${item.buy_date || '-'}</td>
+            <td style="font-size: 0.85em; color: #8b949e;">${formattedDate}</td>
             <td style="font-weight: bold; color: #f9c513;">${holdingDays}</td>
             <td>${item.cost || 0}</td>
             <td>${item.price || '-'}</td>
