@@ -796,8 +796,85 @@ async function processStopLoss() {
     const btn = event.target;
     const originalText = btn.innerText;
     btn.innerText = '⏳ Đang quét...';
+async function exportTopLeaders() {
     try {
-        const res = await fetch('/api/stoploss_tool', {
+        const res = await fetch('/api/top_leaders?limit=10');
+        const leaders = await res.json();
+
+        if (!leaders || leaders.length === 0) {
+            alert('Không có dữ liệu để xuất.');
+            return;
+        }
+
+        // CSV Header and mapping
+        const columns = [
+            { label: 'Symbol', key: 'symbol' },
+            { label: 'Price', key: 'price' },
+            { label: 'ChangePct', key: 'change' },
+            { label: 'VolRatio', key: 'vol_ratio' },
+            { label: 'RSI', key: 'rsi' },
+            { label: 'MarketPhase', key: 'market_phase' },
+            { label: 'ActionRecommendation', key: 'action' },
+            { label: 'LeaderScore', key: 'score' },
+            { label: 'IsSharkDominated', key: 'is_shark_dominated' },
+            { label: 'IsStormResistant', key: 'is_storm_resistant' },
+            { label: 'Tag', key: 'tag' },
+            { label: 'SignalVoTeo', key: 'signal_voteo' },
+            { label: 'SignalBuyDip', key: 'signal_buydip' },
+            { label: 'SignalBreakout', key: 'signal_breakout' },
+            { label: 'SignalGoldenSell', key: 'signal_goldensell' },
+            { label: 'SignalWarning', key: 'signal_warning' },
+            { label: 'RadarPanicSell', key: 'radar_panicsell' },
+            { label: 'RadarSangTay', key: 'radar_sangtay' },
+            { label: 'RadarGayNen', key: 'radar_gaynen' },
+            { label: 'RadarPhanKyAm', key: 'radar_phankyam' },
+            { label: 'RadarDaoDong', key: 'radar_daodong' },
+            { label: 'RadarChamMay', key: 'radar_chammay' },
+            { label: 'PyramidAction', key: 'pyramid_action' },
+            { label: 'BaseDistancePct', key: 'base_distance_pct' },
+            { label: 'Rank', key: 'rank' },
+            { label: 'BuySignalStatus', key: 'buy_signal_status' },
+            { label: 'UpdatedAt', key: 'updated_at' }
+        ];
+
+        let csvContent = "\uFEFF"; // Add BOM for Excel UTF-8 support
+        csvContent += columns.map(c => c.label).join('\t') + '\n'; // Use TAB for better compatibility with target format
+
+        csvContent += leaders.map(leader => {
+            return columns.map(c => {
+                let val = leader[c.key];
+                if (val === undefined || val === null) return '';
+                // Handle booleans
+                if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+                // Escape tabs/newlines in strings
+                if (typeof val === 'string') return val.replace(/\t/g, ' ').replace(/\n/g, ' ');
+                return val;
+            }).join('\t');
+        }).join('\n');
+
+        // Download File
+        const blob = new Blob([csvContent], { type: 'text/tab-separated-values;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Top_10_Leaders_${timestamp}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast('📥 Xuất thành công', `Đã tải về danh sách Top 10 Leaders.`, 'dip');
+    } catch (e) {
+        console.error("Export Error", e);
+        alert('Lỗi khi xuất dữ liệu: ' + e.message);
+    }
+}
+
+// Initial Call to load leaders
+loadTopLeaders();
+
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ portfolio: smh_portfolio })
