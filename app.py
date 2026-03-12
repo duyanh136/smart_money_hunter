@@ -151,28 +151,24 @@ def get_top_leaders():
 def get_top_leaders_history():
     date_str = request.args.get('date')
     if not date_str:
-<<<<<<< HEAD
-        return jsonify({'error': 'Missing date parameter'}), 400
-    try:
-        history = SQLUtils.get_top_leaders_history(date_str)
-        return jsonify(history)
-    except Exception as e:
-        logger.error(f"API top_leaders_history error: {e}")
-        return jsonify({'error': str(e)}), 500
-=======
         return jsonify({'error': 'Date is required'}), 400
     
     leaders = DBService.get_history_by_date(date_str)
     if leaders:
         return jsonify(leaders)
     else:
+        # Fallback to SQLUtils if available
+        try:
+            history = SQLUtils.get_top_leaders_history(date_str)
+            if history: return jsonify(history)
+        except:
+            pass
         return jsonify({'error': 'No data for this date'}), 404
 
 @app.route('/api/top_leaders_dates')
 def get_top_leaders_dates():
     dates = DBService.get_available_dates()
     return jsonify(dates)
->>>>>>> de543b0 (Auto-sync: 2026-03-12 13:46:12)
 
 # Global Watchlist
 WATCHLIST = [
