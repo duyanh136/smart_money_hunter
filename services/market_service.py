@@ -308,7 +308,6 @@ class MarketService:
                         'is_storm_resistant': score_data.get('is_storm_resistant', False),
                         'tag': class_info.get('tag', '') or "🔥 Leader Dòng Tiền",
                         'price': last_row['Close'],
-<<<<<<< HEAD
                         'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2) if len(df) > 1 else 0,
                         'vol_ratio': round(last_row.get('Vol_Ratio', 0), 2),
                         'rsi': round(last_row.get('RSI', 50), 1),
@@ -332,11 +331,6 @@ class MarketService:
                         # Extra metadata for export
                         'buy_signal_status': buy_status,
                         'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-=======
-                        'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2),
-                        'rsi': round(last_row.get('RSI', 50), 1),
-                        'signal_buydip': bool(last_row.get('Signal_BuyDip', False) or last_row.get('Signal_VoTeo', False))
->>>>>>> f6a13dc14f50c2208f773e0888c875b1455c8fdf
                     }
             except Exception as e:
                 logger.error(f"Error scoring {symbol}: {e}")
