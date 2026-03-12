@@ -176,10 +176,15 @@ class TCBSStreamService:
             logger.error(f"TCBSStream: Error parsing message - {e}")
 
     def on_error(self, ws, error):
+        # Suppress common close frame noise (opcode 8) from terminal
+        err_str = str(error)
+        if "opcode=8" in err_str or "fin=1" in err_str:
+            logger.info("TCBSStream: Server suggested connection close.")
+            return
         logger.error(f"TCBSStream Error: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
-        logger.info("TCBSStream: Closed.")
+        logger.info(f"TCBSStream: Connection closed (Status: {close_status_code or 'N/A'})")
         was_running = self.running
         self.running = False
         if was_running:
