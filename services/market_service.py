@@ -342,7 +342,6 @@ class MarketService:
                 res = future.result()
                 if res is not None:
                     results.append(res)
-<<<<<<< HEAD
                 
         # Sort by score descending
         results.sort(key=lambda x: x['score'], reverse=True)
@@ -351,15 +350,10 @@ class MarketService:
         for i, res in enumerate(results):
             res['rank'] = i + 1
             
-        return results[:limit]
-=======
-        
-        results.sort(key=lambda x: x['score'], reverse=True)
         final_leaders = results[:limit]
         
         MarketService._leaders_cache[cache_key] = {'time': now, 'data': final_leaders}
         return final_leaders
-
     @staticmethod
     def run_full_market_scan(save_history: bool = False) -> list:
         """
