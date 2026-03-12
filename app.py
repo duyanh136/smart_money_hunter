@@ -19,11 +19,8 @@ from services.smart_money import SmartMoneyAnalyzer
 from services.tcbs_service import tcbs_service
 from services.tcbs_socket import tcbs_stream
 from services.telegram_bot import run_bot_scheduler, check_realtime_stoploss, load_portfolio, reload_telegram_bot_cache
-<<<<<<< HEAD
 from services.sql_utils import SQLUtils
-=======
 from services.db_service import DBService
->>>>>>> de543b0 (Auto-sync: 2026-03-12 13:46:12)
 import threading
 import pandas as pd
 import json
