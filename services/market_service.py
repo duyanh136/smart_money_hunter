@@ -444,4 +444,3 @@ class MarketService:
             logger.info(f"Saved full market analysis & history for {today}")
         
         return results
->>>>>>> f6a13dc14f50c2208f773e0888c875b1455c8fdf
