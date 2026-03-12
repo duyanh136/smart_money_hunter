@@ -365,9 +365,13 @@ def auto_save_daily_leaders():
     """Fetches Top 10 leaders and saves them to SQL History at 16:00 every day."""
     logger.info("Executing daily 16:00 Market Analysis History Backup...")
     try:
-        # 1. Run the FULL market scan for all stocks and SAVE TO HISTORY
+        # 1. Run the FULL market scan for all stocks and SAVE TO HISTORY (SQL Server)
         logger.info("Executing comprehensive full market scan with History Backup...")
         results = MarketService.run_full_market_scan(save_history=True)
+        
+        # 1.5 Save to Local SQLite History
+        logger.info("Auto-Snapshot: Saving Top 5 Leaders to local SQLite...")
+        DBService.take_snapshot()
         
         # 2. Extract Top 10 leaders from the results (they are already ranked)
         leaders = [r for r in results if r.get('rank') is not None and r.get('rank') <= 10]
@@ -413,9 +417,8 @@ def run_bot_scheduler():
     # Schedule every 30 minutes
     schedule.every(30).minutes.do(check_portfolio_and_send_alert)
     
-<<<<<<< HEAD
     # Daily scan at 16:00 (After Market Close)
-    # Job 1: Daily scan at 16:00
+    # Job 1: Daily scan at 16:00 (Saves to SQL Server AND SQLite)
     schedule.every().day.at("16:00").do(auto_save_daily_leaders)
     
     # Job 2: Hourly scan during trading session (9:00 - 15:00)
@@ -438,15 +441,6 @@ def run_bot_scheduler():
     threading.Thread(target=startup_warmup, daemon=True).start()
 
     logger.info("Telegram Bot Scheduler started. Jobs scheduled: 16:00 Daily + Hourly Trading.")
-=======
-    # Schedule Daily Top 5 Snapshot at 16:00 (Trading day close + buffer)
-    schedule.every().monday.at("16:00").do(DBService.take_snapshot)
-    schedule.every().tuesday.at("16:00").do(DBService.take_snapshot)
-    schedule.every().wednesday.at("16:00").do(DBService.take_snapshot)
-    schedule.every().thursday.at("16:00").do(DBService.take_snapshot)
-    schedule.every().friday.at("16:00").do(DBService.take_snapshot)
-    
->>>>>>> d415bef (Auto-sync: 2026-03-12 13:53:49)
     while True:
         schedule.run_pending()
         time.sleep(60)
