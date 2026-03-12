@@ -12,3 +12,4 @@ python-dotenv
 schedule
 pymssql
 pyodbc
+watchdog

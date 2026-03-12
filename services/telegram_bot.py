@@ -33,7 +33,8 @@ def init_portfolio_cache():
                 'current_sl': float(item.get('current_sl', 0)),
                 'alert_sent': bool(item.get('alert_sent', False))
             }
-    portfolio_cache = new_cache
+    portfolio_cache.clear()
+    portfolio_cache.update(new_cache)
 
 def reload_telegram_bot_cache():
     logger.info("Forcing Telegram Bot Portfolio Cache Reload...")

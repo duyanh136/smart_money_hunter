@@ -222,6 +222,7 @@ class MarketService:
         from services.symbol_loader import SymbolLoader
         from services.smart_money import SmartMoneyAnalyzer
         import concurrent.futures
+        from datetime import datetime
         
         # Select all liquid stocks from HOSE, HNX, UPCOM
         leader_universe = SymbolLoader.get_liquid_stocks()
@@ -243,6 +244,13 @@ class MarketService:
                     last_row = df.iloc[-1]
                     class_info = SmartMoneyAnalyzer.classify_stock(symbol)
                     
+                    # Buy Signal Status (Simplified)
+                    buy_status = "QUAN SÁT"
+                    if last_row.get('Signal_BuyDip') or last_row.get('Signal_VoTeo'):
+                        buy_status = "MUA GOM"
+                    if last_row.get('Signal_Breakout'):
+                        buy_status = "ĐỘT PHÁ"
+
                     return {
                         'symbol': symbol,
                         'score': score,
@@ -250,10 +258,29 @@ class MarketService:
                         'is_storm_resistant': score_data.get('is_storm_resistant', False),
                         'tag': class_info.get('tag', ''),
                         'price': last_row['Close'],
-                        'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2),
+                        'change': round((last_row['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close'] * 100, 2) if len(df) > 1 else 0,
+                        'vol_ratio': round(last_row.get('Vol_Ratio', 0), 2),
+                        'rsi': round(last_row.get('RSI', 50), 1),
+                        'market_phase': last_row.get('Market_Phase', 'N/A'),
                         'action': last_row.get('Action_Recommendation', 'N/A'),
-                        'signal_buydip': bool(last_row.get('Signal_BuyDip', False) or last_row.get('Signal_VoTeo', False)),
-                        'rsi': round(last_row.get('RSI', 50), 1)
+                        'pyramid_action': last_row.get('Pyramid_Action', 'N/A'),
+                        'base_distance_pct': round(last_row.get('Base_Distance_Pct', 0), 2),
+                        # Signals
+                        'signal_voteo': bool(last_row.get('Signal_VoTeo')),
+                        'signal_buydip': bool(last_row.get('Signal_BuyDip')),
+                        'signal_breakout': bool(last_row.get('Signal_Breakout')),
+                        'signal_goldensell': bool(last_row.get('Signal_GoldenSell')),
+                        'signal_warning': bool(last_row.get('Signal_Distribution') or last_row.get('Signal_UpBo')),
+                        # Radar Signals
+                        'radar_panicsell': bool(last_row.get('Signal_PanicSell')),
+                        'radar_sangtay': bool(last_row.get('Signal_SangTayNhoLe')),
+                        'radar_gaynen': bool(last_row.get('Signal_GayNenTestLai')),
+                        'radar_phankyam': bool(last_row.get('Signal_PhanKyAmMACD')),
+                        'radar_daodong': bool(last_row.get('Signal_DaoDongLongLeo')),
+                        'radar_chammay': bool(last_row.get('Signal_ChamMayKenhDuoi')),
+                        # Extra metadata for export
+                        'buy_signal_status': buy_status,
+                        'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     }
             except Exception as e:
                 logger.error(f"Error scoring {symbol}: {e}")
@@ -267,6 +294,11 @@ class MarketService:
                 if res is not None:
                     results.append(res)
                 
-        # Sort by score descending and take top N
+        # Sort by score descending
         results.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Add Rank
+        for i, res in enumerate(results):
+            res['rank'] = i + 1
+            
         return results[:limit]

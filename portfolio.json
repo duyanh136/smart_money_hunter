@@ -1,65 +1,23 @@
 [
     {
-        "symbol": "HPG",
-        "cost": 27970.0,
-        "volume": 200.0,
-        "current_sl": 25173.0,
-        "alert_sent": false
-    },
-    {
-        "symbol": "PNJ",
-        "cost": 123335.0,
-        "volume": 200.0,
-        "current_sl": 111001.5,
-        "alert_sent": false
-    },
-    {
-        "symbol": "GMD",
-        "cost": 77015.0,
-        "volume": 200.0,
-        "current_sl": 69313.5,
-        "alert_sent": false
-    },
-    {
-        "symbol": "HCM",
-        "cost": 24887.0,
-        "volume": 500.0,
-        "current_sl": 22398.3,
-        "alert_sent": false
-    },
-    {
-        "symbol": "NT2",
-        "cost": 27942.0,
-        "volume": 400.0,
-        "current_sl": 25147.8,
+        "symbol": "POW",
+        "cost": 14221.0,
+        "volume": 100.0,
+        "current_sl": 12798.9,
         "alert_sent": false
     },
     {
         "symbol": "GVR",
-        "cost": 41712.0,
-        "volume": 300.0,
-        "current_sl": 37540.8,
+        "cost": 40661.0,
+        "volume": 100.0,
+        "current_sl": 36594.9,
         "alert_sent": false
     },
     {
-        "symbol": "ORS",
-        "cost": 14772.0,
-        "volume": 1000.0,
-        "current_sl": 13294.800000000001,
-        "alert_sent": false
-    },
-    {
-        "symbol": "PC1",
-        "cost": 28493.0,
-        "volume": 400.0,
-        "current_sl": 25643.7,
-        "alert_sent": false
-    },
-    {
-        "symbol": "PET",
-        "cost": 39309.0,
-        "volume": 300.0,
-        "current_sl": 35378.1,
+        "symbol": "HPG",
+        "cost": 27970.0,
+        "volume": 100.0,
+        "current_sl": 25173.0,
         "alert_sent": false
     }
 ]
