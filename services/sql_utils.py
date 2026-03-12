@@ -122,3 +122,98 @@ class SQLUtils:
         finally:
             conn.close()
         return None
+    @staticmethod
+    def save_market_analysis(data: Dict[str, Any]):
+        conn = SQLUtils.get_connection()
+        if not conn: return
+        
+        p = SQLUtils._get_placeholder(conn)
+        sql = f"""
+        IF EXISTS (SELECT 1 FROM MarketAnalysis WHERE Symbol = {p})
+            UPDATE MarketAnalysis SET 
+                Price = {p}, [Change] = {p}, VolRatio = {p}, RSI = {p}, 
+                MarketPhase = {p}, [Action] = {p}, LeaderScore = {p}, 
+                IsSharkDominated = {p}, IsStormResistant = {p}, Tag = {p},
+                SignalVoTeo = {p}, SignalBuyDip = {p}, SignalBreakout = {p}, 
+                SignalGoldenSell = {p}, SignalWarning = {p}, RadarPanicSell = {p}, 
+                RadarSangTay = {p}, RadarGayNen = {p}, RadarPhanKyAm = {p}, 
+                RadarDaoDong = {p}, RadarChamMay = {p}, PyramidAction = {p}, 
+                BaseDistancePct = {p}, LastUpdated = GETDATE() 
+            WHERE Symbol = {p}
+        ELSE
+            INSERT INTO MarketAnalysis (
+                Symbol, Price, [Change], VolRatio, RSI, MarketPhase, [Action], 
+                LeaderScore, IsSharkDominated, IsStormResistant, Tag,
+                SignalVoTeo, SignalBuyDip, SignalBreakout, SignalGoldenSell, 
+                SignalWarning, RadarPanicSell, RadarSangTay, RadarGayNen, 
+                RadarPhanKyAm, RadarDaoDong, RadarChamMay, PyramidAction, 
+                BaseDistancePct, LastUpdated
+            ) VALUES (
+                {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, 
+                {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, GETDATE()
+            )
+        """
+        
+        args = (
+            data['symbol'], data['price'], data['change'], data['vol_ratio'], data['rsi'],
+            data['market_phase'], data['action'], data['leader_score'],
+            1 if data['is_shark_dominated'] else 0, 1 if data['is_storm_resistant'] else 0, data['tag'],
+            1 if data['signal_voteo'] else 0, 1 if data['signal_buydip'] else 0, 1 if data['signal_breakout'] else 0,
+            1 if data['signal_goldensell'] else 0, 1 if data['signal_warning'] else 0, 1 if data['radar_panicsell'] else 0,
+            1 if data['radar_sangtay'] else 0, 1 if data['radar_gaynen'] else 0, 1 if data['radar_phankyam'] else 0,
+            1 if data['radar_daodong'] else 0, 1 if data['radar_chammay'] else 0, data['pyramid_action'],
+            data['base_distance_pct'], data['symbol'], # Update params
+            data['symbol'], data['price'], data['change'], data['vol_ratio'], data['rsi'],
+            data['market_phase'], data['action'], data['leader_score'],
+            1 if data['is_shark_dominated'] else 0, 1 if data['is_storm_resistant'] else 0, data['tag'],
+            1 if data['signal_voteo'] else 0, 1 if data['signal_buydip'] else 0, 1 if data['signal_breakout'] else 0,
+            1 if data['signal_goldensell'] else 0, 1 if data['signal_warning'] else 0, 1 if data['radar_panicsell'] else 0,
+            1 if data['radar_sangtay'] else 0, 1 if data['radar_gaynen'] else 0, 1 if data['radar_phankyam'] else 0,
+            1 if data['radar_daodong'] else 0, 1 if data['radar_chammay'] else 0, data['pyramid_action'],
+            data['base_distance_pct'] # Insert params
+        )
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql, args)
+            if not getattr(conn, 'autocommit', False):
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error saving market analysis for {data['symbol']}: {e}")
+        finally:
+            conn.close()
+
+    @staticmethod
+    def save_analysis_history(data: Dict[str, Any]):
+        conn = SQLUtils.get_connection()
+        if not conn: return
+        
+        p = SQLUtils._get_placeholder(conn)
+        sql = f"""
+        INSERT INTO MarketAnalysisHistory (
+            Symbol, Price, [Change], VolRatio, RSI, MarketPhase, [Action], 
+            LeaderScore, IsSharkDominated, IsStormResistant,
+            SignalVoTeo, SignalBuyDip, SignalBreakout, SignalGoldenSell, 
+            SignalWarning, AnalysisDate
+        ) VALUES (
+            {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, GETDATE()
+        )
+        """
+        
+        args = (
+            data['symbol'], data['price'], data['change'], data['vol_ratio'], data['rsi'],
+            data['market_phase'], data['action'], data['leader_score'],
+            1 if data['is_shark_dominated'] else 0, 1 if data['is_storm_resistant'] else 0,
+            1 if data['signal_voteo'] else 0, 1 if data['signal_buydip'] else 0, 1 if data['signal_breakout'] else 0,
+            1 if data['signal_goldensell'] else 0, 1 if data['signal_warning'] else 0
+        )
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql, args)
+            if not getattr(conn, 'autocommit', False):
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error saving analysis history for {data['symbol']}: {e}")
+        finally:
+            conn.close()

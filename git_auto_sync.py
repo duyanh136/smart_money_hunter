@@ -38,20 +38,19 @@ def sync_to_github():
     try:
         logger.info("Starting sync to GitHub...")
         
-        # Check if there are actual changes
-        status = subprocess.check_output(["git", "status", "--porcelain"], shell=True).decode().strip()
+        status = subprocess.check_output(["C:/Program Files/Git/cmd/git.exe", "status", "--porcelain"], shell=True).decode().strip()
         if not status:
             logger.info("No changes to sync.")
             return
 
         # Git operations
-        subprocess.run(["git", "add", "."], shell=True, check=True)
+        subprocess.run(["C:/Program Files/Git/cmd/git.exe", "add", "."], shell=True, check=True)
         
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         commit_msg = f"Auto-sync: {timestamp}"
-        subprocess.run(["git", "commit", "-m", commit_msg], shell=True, check=True)
+        subprocess.run(["C:/Program Files/Git/cmd/git.exe", "commit", "-m", commit_msg], shell=True, check=True)
         
-        subprocess.run(["git", "push", "origin", "main"], shell=True, check=True)
+        subprocess.run(["C:/Program Files/Git/cmd/git.exe", "push", "origin", "main"], shell=True, check=True)
         logger.info(f"Sync successful: {commit_msg}")
         
     except subprocess.CalledProcessError as e:
