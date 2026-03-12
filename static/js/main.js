@@ -838,8 +838,18 @@ function renderStopLossTable() {
     }
 
     smh_portfolio.forEach((item, index) => {
+        let holdingDays = '-';
+        if (item.buy_date) {
+            const buyDate = new Date(item.buy_date);
+            const today = new Date();
+            const diffTime = Math.abs(today - buyDate);
+            holdingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
         const row = `<tr>
             <td style="font-weight:bold; text-align: left; color:#a5d6ff;">${item.symbol}</td>
+            <td style="font-size: 0.85em; color: #8b949e;">${item.buy_date || '-'}</td>
+            <td style="font-weight: bold; color: #f9c513;">${holdingDays}</td>
             <td>${item.cost || 0}</td>
             <td>${item.price || '-'}</td>
             <td style="${item.pnl_percent >= 0 ? 'color: #4CAF50' : 'color: #ff5252'}">${item.pnl_percent !== undefined ? item.pnl_percent + '%' : '-'}</td>
@@ -856,20 +866,26 @@ function addStopLossItem() {
     if (!sym) return;
     let cost = document.getElementById('sl-input-cost').value;
     let volume = document.getElementById('sl-input-vol').value;
+    let buyDate = document.getElementById('sl-input-buydate').value;
 
     // Check if exists
     let ext = smh_portfolio.find(i => i.symbol === sym);
     if (ext) {
         ext.cost = parseFloat(cost) || ext.cost;
         ext.volume = parseFloat(volume) || ext.volume;
+        ext.buy_date = buyDate || ext.buy_date;
     } else {
         smh_portfolio.push({
             symbol: sym,
             cost: parseFloat(cost) || 0,
-            volume: parseFloat(volume) || 0
+            volume: parseFloat(volume) || 0,
+            buy_date: buyDate || null
         });
     }
     document.getElementById('sl-input-symbol').value = '';
+    document.getElementById('sl-input-cost').value = '';
+    document.getElementById('sl-input-vol').value = '';
+    document.getElementById('sl-input-buydate').value = '';
     savePortfolio();
     renderStopLossTable();
 }
