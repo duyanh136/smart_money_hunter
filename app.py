@@ -392,6 +392,7 @@ def stoploss_tool():
             "symbol": item["symbol"],
             "cost": item["cost"],
             "volume": next((float(p.get("volume", 0)) for p in portfolio if p.get("symbol") == item["symbol"]), 0),
+            "buy_date": next((p.get("buy_date") for p in portfolio if p.get("symbol") == item["symbol"]), None),
             "current_sl": item["cost"] * 0.9, # Safety floor: 10% from cost
             "alert_sent": False
         })
