@@ -273,7 +273,7 @@ class MarketService:
         cache_key = f"leaders_{limit}"
         if cache_key in MarketService._leaders_cache:
             entry = MarketService._leaders_cache[cache_key]
-            if (now - entry['time']).total_seconds() < 300: # 5 mins
+            if (now - entry['time']).total_seconds() < 900: # 15 mins cache for stability
                 logger.info("Returning real-time leaders from memory cache.")
                 return entry['data']
 

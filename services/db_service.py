@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'smart_money_hunter.db')
 
 class DBService:
+    _last_saved_date = None
+
     @staticmethod
     def init_db():
         """Initialize SQLite database and table for top leaders history."""
@@ -36,6 +38,11 @@ class DBService:
             return
             
         date_str = datetime.now().strftime('%Y-%m-%d')
+        
+        # Performance optimization: Skip if already saved today
+        if DBService._last_saved_date == date_str:
+            return
+            
         leaders_json = json.dumps(leaders)
         
         try:
@@ -48,7 +55,8 @@ class DBService:
             ''', (date_str, leaders_json))
             conn.commit()
             conn.close()
-            logger.info(f"Saved Top Leaders for {date_str}")
+            DBService._last_saved_date = date_str
+            logger.info(f"Saved Top Leaders for {date_str} to SQLite")
         except Exception as e:
             logger.error(f"Failed to save Top Leaders to SQLite: {e}")
 

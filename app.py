@@ -138,9 +138,9 @@ def get_top_leaders():
         limit = int(request.args.get('limit', 10))
         leaders = MarketService.get_top_leaders(limit=limit)
         
-        # Save to SQLite for history (only for default limit or if not on Vercel)
+        # Save to SQLite for history in background (only for default limit or if not on Vercel)
         if limit >= 5 and not IS_VERCEL:
-            DBService.save_top_leaders(leaders)
+            threading.Thread(target=DBService.save_top_leaders, args=(leaders,), daemon=True).start()
             
         return jsonify(leaders)
     except Exception as e:
