@@ -236,8 +236,69 @@ class SQLUtils:
             
             if not getattr(conn, 'autocommit', False):
                 conn.commit()
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_top_leaders_history(date_str: str) -> List[Dict[str, Any]]:
+        """Retrieves top leaders for a specific date from SQL History."""
+        conn = SQLUtils.get_connection()
+        if not conn: return []
+        
+        p = SQLUtils._get_placeholder(conn)
+        sql = f"""
+            SELECT Symbol, Price, ChangePct, VolRatio, RSI, MarketPhase, ActionRecommendation,
+                   LeaderScore, Rank, BuySignalStatus, IsSharkDominated, IsStormResistant
+            FROM MarketAnalysisHistory
+            WHERE AnalysisDate = {p}
+            ORDER BY Rank ASC
+        """
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql, (date_str,))
+            columns = [column[0] for column in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+            
+            # Map SQL names back to frontend expected names if different
+            mapped_results = []
+            for r in results:
+                mapped_results.append({
+                    'symbol': r['Symbol'],
+                    'price': float(r['Price']),
+                    'change': float(r['ChangePct']),
+                    'vol_ratio': float(r['VolRatio']),
+                    'rsi': float(r['RSI']),
+                    'market_phase': r['MarketPhase'],
+                    'action': r['ActionRecommendation'],
+                    'score': int(r['LeaderScore']),
+                    'rank': int(r['Rank']),
+                    'buy_signal_status': r['BuySignalStatus'],
+                    'is_shark_dominated': bool(r['IsSharkDominated']),
+                    'is_storm_resistant': bool(r['IsStormResistant']),
+                })
+            return mapped_results
         except Exception as e:
-            logger.error(f"Error saving market analysis history: {e}")
+            logger.error(f"Error fetching historical leaders for {date_str}: {e}")
+            return []
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_available_history_dates() -> List[str]:
+        """Retrieves list of dates that have historical analysis records."""
+        conn = SQLUtils.get_connection()
+        if not conn: return []
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT AnalysisDate FROM MarketAnalysisHistory ORDER BY AnalysisDate DESC")
+            return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Error fetching history dates: {e}")
+            return []
         finally:
             conn.close()
 
