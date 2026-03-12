@@ -12,5 +12,12 @@
         "volume": 300.0,
         "current_sl": 35648.1,
         "alert_sent": false
+    },
+    {
+        "symbol": "STB",
+        "cost": 66500.0,
+        "volume": 200.0,
+        "current_sl": 59850.0,
+        "alert_sent": false
     }
 ]
