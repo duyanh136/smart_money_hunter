@@ -435,6 +435,39 @@ class SmartMoneyAnalyzer:
         return df.iloc[-1].get('Pyramid_Action', 'Full Size (Tỷ trọng lớn)')
 
     @staticmethod
+    def get_buy_signal_status(df: pd.DataFrame) -> str:
+        """Returns a Vietnamese status string based on technical signals."""
+        if df is None or df.empty: return "N/A"
+        last = df.iloc[-1]
+        
+        # 1. Negative / Caution signals first
+        if last.get('Signal_GoldenSell') or last.get('Signal_Distribution') or last.get('Signal_UpBo'):
+            return "CẢNH BÁO: BÁN/THOÁT"
+        
+        rsi = last.get('RSI', 50)
+        if rsi > 70:
+            return "CẤM ĐU XANH TÍM (RSI QUÁ CAO)"
+            
+        # 2. Strong Buy signals
+        if last.get('Signal_Super') and last.get('Signal_BuyDip'):
+            return "BÁO ĐỘNG MÚC (SIÊU ĐIỂM MUA)"
+            
+        if last.get('Signal_Super'):
+            return "BÁO ĐỘNG MÚC (DÒNG TIỀN LỚN)"
+            
+        if last.get('Signal_BuyDip'):
+            return "ĐÃ NẠP ĐẠN (CANH GIÁ ĐỎ)"
+            
+        if last.get('Signal_Breakout'):
+            return "ĐÃ NẠP ĐẠN (BREAKOUT)"
+            
+        if last.get('Signal_VoTeo'):
+            return "THEO DÕI (CẠN CUNG)"
+            
+        # 3. Default
+        return "QUAN SÁT"
+
+    @staticmethod
     def calc_leader_score(df: pd.DataFrame, index_df: pd.DataFrame = None) -> float:
         """
         Calculate Leader Score based on 4 criteria:

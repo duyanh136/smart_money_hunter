@@ -5,12 +5,15 @@ import requests
 import schedule
 import time
 import math
+import threading
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
+from services.db_service import DBService
 
 from services.market_service import MarketService
 from services.smart_money import SmartMoneyAnalyzer
+from services.sql_utils import SQLUtils
 
 load_dotenv()
 
@@ -358,6 +361,55 @@ def check_portfolio_and_send_alert():
     except Exception as e:
         logger.error(f"Error sending Telegram message: {e}")
 
+def auto_save_daily_leaders():
+    """Fetches Top 10 leaders and saves them to SQL History at 16:00 every day."""
+    logger.info("Executing daily 16:00 Market Analysis History Backup...")
+    try:
+        # 1. Run the FULL market scan for all stocks and SAVE TO HISTORY (SQL Server)
+        logger.info("Executing comprehensive full market scan with History Backup...")
+        results = MarketService.run_full_market_scan(save_history=True)
+        
+        # 1.5 Save to Local SQLite History
+        logger.info("Auto-Snapshot: Saving Top 5 Leaders to local SQLite...")
+        DBService.take_snapshot()
+        
+        # 2. Extract Top 10 leaders from the results (they are already ranked)
+        leaders = [r for r in results if r.get('rank') is not None and r.get('rank') <= 10]
+        leaders.sort(key=lambda x: x.get('rank', 99))
+        
+        logger.info(f"Successfully finished full market scan. Saved {len(results)} symbols to history.")
+        
+        # 3. Send a detailed summary to Telegram
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        
+        if bot_token and chat_id:
+            if leaders:
+                leader_lines = []
+                for l in leaders:
+                    shark = "💎" if l.get('is_shark_dominated') else ""
+                    storm = "🛡️" if l.get('is_storm_resistant') else ""
+                    line = f"#{l['rank']} <b>{l['symbol']}</b> (P: {l['price']:.1f}, {l['change']:+.1f}%) {shark}{storm}"
+                    leader_lines.append(line)
+                
+                leader_list_str = "\n".join(leader_lines)
+                msg = (
+                    f"📊 <b>BÁO CÁO KẾT PHIÊN {datetime.now().strftime('%d/%m/%Y')}</b>\n\n"
+                    f"✅ Đã lưu trữ dữ liệu phân tích của {len(results)} mã vào SQL Server.\n\n"
+                    f"🏆 <b>TOP 10 CỔ PHIẾU MẠNH NHẤT:</b>\n"
+                    f"{leader_list_str}\n\n"
+                    f"<i>Sau này bạn có thể truy vấn bảng MarketAnalysisHistory để xem lại.</i>"
+                )
+            else:
+                msg = f"📊 <b>BÁO CÁO KẾT PHIÊN {datetime.now().strftime('%d/%m/%Y')}</b>\n\n✅ Đã hoàn thành sao lưu dữ liệu toàn thị trường vào SQL Server."
+                
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            requests.post(url, json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}, timeout=10)
+            
+    except Exception as e:
+        logger.error(f"Error in auto_save_daily_leaders: {e}")
+        send_system_alert(f"Lỗi khi lưu dữ liệu lịch sử lúc 16:00: {e}")
+
 def run_bot_scheduler():
     logger.info("Initializing Telegram Bot Scheduler & Cache...")
     init_portfolio_cache()
@@ -365,6 +417,30 @@ def run_bot_scheduler():
     # Schedule every 30 minutes
     schedule.every(30).minutes.do(check_portfolio_and_send_alert)
     
+    # Daily scan at 16:00 (After Market Close)
+    # Job 1: Daily scan at 16:00 (Saves to SQL Server AND SQLite)
+    schedule.every().day.at("16:00").do(auto_save_daily_leaders)
+    
+    # Job 2: Hourly scan during trading session (9:00 - 15:00)
+    # This ensures the cache is fresh for daytime users
+    def hourly_trading_scan():
+        now = datetime.now()
+        # Mon-Fri, 9am-4pm
+        if now.weekday() < 5 and 9 <= now.hour <= 16:
+            logger.info("Scheduled Hourly Trading Scan triggered...")
+            MarketService.run_full_market_scan()
+            
+    schedule.every().hour.at(":05").do(hourly_trading_scan)
+    
+    # Job 3: One-time scan at startup to warm up the cache
+    def startup_warmup():
+        logger.info("Startup cache warmup triggered...")
+        MarketService.run_full_market_scan()
+    
+    # Run startup warmup in a separate thread to not block the main loop
+    threading.Thread(target=startup_warmup, daemon=True).start()
+
+    logger.info("Telegram Bot Scheduler started. Jobs scheduled: 16:00 Daily + Hourly Trading.")
     while True:
         schedule.run_pending()
         time.sleep(60)

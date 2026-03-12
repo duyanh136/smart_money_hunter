@@ -1,8 +1,13 @@
 // Main JS
+const isVercel = window.location.hostname.includes('vercel.app');
+
 const socket = io({
-    transports: ['websocket', 'polling'],
-    upgrade: true
+    transports: isVercel ? ['polling'] : ['websocket', 'polling'], // Faster fallback on Vercel
+    upgrade: !isVercel,
+    reconnectionAttempts: 3,
+    timeout: 10000
 });
+
 let priceChart, flowChart, rsiChart, macdChart;
 let candleSeries, pocSeries, sharkSeries, retailSeries;
 let rsiSeries, macdLineSeries, macdSignalSeries, macdHistSeries, ma20Series, ma50Series;
@@ -12,11 +17,15 @@ let currentPeriod = '1y';
 let lastScanResults = []; // Cache for filtering
 
 document.addEventListener('DOMContentLoaded', () => {
-    initCharts();
-    loadSymbols();
-    loadData(currentSymbol);
-    loadMarketHealth(); // Fetch market weather & health
-    loadTopLeaders(); // Fetch Top 5 Leaders
+    try {
+        initCharts();
+        loadSymbols();
+        loadData(currentSymbol);
+        loadMarketHealth(); // Fetch market weather & health
+        loadTopLeaders(); // Fetch Top 5 Leaders
+    } catch (err) {
+        console.error("Initialization error:", err);
+    }
 
     // Setup Toast Container
     if (!document.getElementById('toast-container')) {
@@ -26,14 +35,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Event Listeners
-    document.getElementById('symbol-input').addEventListener('change', (e) => {
-        currentSymbol = e.target.value.toUpperCase();
-        loadData(currentSymbol);
-    });
+    const symbolInput = document.getElementById('symbol-input');
+    if (symbolInput) {
+        symbolInput.addEventListener('change', (e) => {
+            currentSymbol = e.target.value.toUpperCase();
+            loadData(currentSymbol);
+        });
+    }
 
     // --- WebSocket Socket.IO ---
     socket.on('connect', () => {
         console.log("Connected to server");
+    });
+
+    socket.on('connect_error', (err) => {
+        console.warn("Socket.IO connection error (expected on Vercel):", err.message);
+        if (isVercel) socket.disconnect(); // Don't spam on Vercel
     });
 
     socket.on('server_status', (data) => {
@@ -46,21 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceEl = document.getElementById('current-price');
             if (priceEl && data.price) {
                 priceEl.innerText = parseFloat(data.price).toFixed(2);
-                // Simple nudge/flash effect
                 priceEl.style.color = '#e6b800';
                 setTimeout(() => priceEl.style.color = '#fff', 500);
             }
 
-            // Update Volume if present
             if (data.vol) {
                 const volEl = document.getElementById('current-vol');
                 if (volEl) volEl.innerText = new Intl.NumberFormat('en-US').format(data.vol);
             }
-
-            // Real-time chart update (Daily candle)
-            // We assume the update is for the CURRENT day (last bar)
-            // Ideally we'd compare data.time with the last bar time.
-            // For now, let's just update the UI price.
         }
     });
 });
@@ -273,10 +283,33 @@ async function loadData(symbol, period = '1y') {
             return;
         }
 
-        // Update UI Info
+        // Update Stock Info Metadata
         document.getElementById('stock-symbol').innerText = data.symbol;
         document.getElementById('stock-group').innerText = data.group;
-        document.getElementById('strategy-text').innerText = data.strategy;
+        document.getElementById('stock-strategy').innerText = data.strategy;
+        document.getElementById('stock-phase').innerText = data.market_phase;
+        document.getElementById('stock-action').innerText = data.action;
+        document.getElementById('stock-base').innerText = `${data.base_distance_pct}% (Độ thắt chặt)`;
+
+        // --- NEW: Update Badges & Vietnamese Buy Signal Status ---
+        const badgeContainer = document.getElementById('badges-container');
+        if (badgeContainer) {
+            badgeContainer.innerHTML = '';
+            if (data.is_shark_dominated) {
+                badgeContainer.innerHTML += '<span class="badge badge-shark">💎 Tiền Lớn</span>';
+            }
+            if (data.is_storm_resistant) {
+                badgeContainer.innerHTML += '<span class="badge badge-storm">🛡️ Kháng Bão</span>';
+            }
+        }
+        
+        const signalStatusEl = document.getElementById('buy-signal-status');
+        if (signalStatusEl) {
+            signalStatusEl.innerText = data.buy_signal_status || "Quan Sát / Chờ Điểm Mua";
+            if (data.buy_signal_status === "🚨 BÁO ĐỘNG MÚC") signalStatusEl.style.color = '#4CAF50';
+            else if (data.buy_signal_status === "🛑 CẤM ĐU XANH TÍM") signalStatusEl.style.color = '#ff6b6b';
+            else signalStatusEl.style.color = '#e4e6eb';
+        }
 
         // Update Volume Info
         const last = data.data[data.data.length - 1];
@@ -450,50 +483,106 @@ async function loadTopLeaders() {
         if (container) container.style.display = 'block';
         if (grid) grid.innerHTML = '';
 
-        leaders.forEach((leader, index) => {
-            const changeClass = leader.change >= 0 ? 'positive' : 'negative';
-            const sign = leader.change > 0 ? '+' : '';
-
-            // Format tag safely
-            let tagHtml = leader.tag || "🔥 Siêu cổ / Leader";
-            // Replace newlines or make it compact if needed
-
-            let badgesHtml = '';
-            if (leader.is_shark_dominated) {
-                badgesHtml += '<span class="badge" style="font-size:0.65rem; padding: 2px 4px; background: #238636; color: white; border-radius: 4px; margin-right: 4px;" title="Cá mập gom mạnh, nhỏ lẻ thoát hàng">💎 Tiền Lớn</span>';
-            }
-            if (leader.is_storm_resistant) {
-                badgesHtml += '<span class="badge" style="font-size:0.65rem; padding: 2px 4px; background: #9e6a03; color: white; border-radius: 4px; margin-right: 4px;" title="Cổ phiếu trơ với nhịp sập của VN-Index">🛡️ Kháng Bão</span>';
-            }
-
-            if (badgesHtml) {
-                tagHtml = '<div style="margin-bottom: 4px;">' + badgesHtml + '</div>' + tagHtml;
-            }
-
-            const cardHtml = `
-                <div class="leader-card" onclick="loadData('${leader.symbol}')">
-                    <div class="leader-symbol">
-                        <span>${leader.symbol}</span>
-                        <span class="leader-score">Top ${index + 1} (${leader.score}đ)</span>
-                    </div>
-                    <div class="leader-tag" style="line-height: 1.4;">${tagHtml}</div>
-                    
-                    <div class="leader-price-row">
-                        <span class="leader-price">${new Intl.NumberFormat('en-US').format(leader.price)}</span>
-                        <span class="leader-change ${changeClass}">${sign}${leader.change}%</span>
-                    </div>
-                    
-                    <div class="leader-actions">
-                        <button class="btn-buy-leader" onclick="event.stopPropagation(); handleLeaderAction('BUY', '${leader.symbol}', ${leader.price}, ${leader.signal_buydip}, ${leader.rsi})">MUA</button>
-                        <button class="btn-sell-leader" onclick="event.stopPropagation(); handleLeaderAction('SELL', '${leader.symbol}', ${leader.price}, false, 0)">BÁN</button>
-                    </div>
-                </div>
-            `;
-            grid.innerHTML += cardHtml;
-        });
+        renderLeadersGrid(leaders);
 
     } catch (e) {
         console.error("Top Leaders Error", e);
+    }
+}
+
+function renderLeadersGrid(leaders) {
+    const grid = document.getElementById('leaders-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    leaders.forEach((leader, index) => {
+        const changeClass = leader.change >= 0 ? 'positive' : 'negative';
+        const sign = leader.change > 0 ? '+' : '';
+
+        // Format tag safely
+        let tagHtml = leader.tag || "🔥 Siêu cổ / Leader";
+
+        let badgesHtml = '';
+        if (leader.is_shark_dominated) {
+            badgesHtml += '<span class="badge" style="font-size:0.65rem; padding: 2px 4px; background: #238636; color: white; border-radius: 4px; margin-right: 4px;" title="Cá mập gom mạnh, nhỏ lẻ thoát hàng">💎 Tiền Lớn</span>';
+        }
+        if (leader.is_storm_resistant) {
+            badgesHtml += '<span class="badge" style="font-size:0.65rem; padding: 2px 4px; background: #9e6a03; color: white; border-radius: 4px; margin-right: 4px;" title="Cổ phiếu trơ với nhịp sập của VN-Index">🛡️ Kháng Bão</span>';
+        }
+
+        if (badgesHtml) {
+            tagHtml = '<div style="margin-bottom: 4px;">' + badgesHtml + '</div>' + tagHtml;
+        }
+
+        const cardHtml = `
+            <div class="leader-card" onclick="loadData('${leader.symbol}')">
+                <div class="leader-symbol">
+                    <span>${leader.symbol}</span>
+                    <span class="leader-score">Top ${index + 1} (${leader.score}đ)</span>
+                </div>
+                <div class="leader-tag" style="line-height: 1.4;">${tagHtml}</div>
+                
+                <div class="leader-price-row">
+                    <span class="leader-price">${new Intl.NumberFormat('en-US').format(leader.price)}</span>
+                    <span class="leader-change ${changeClass}">${sign}${leader.change}%</span>
+                </div>
+                
+                <div class="leader-actions">
+                    <button class="btn-buy-leader" onclick="event.stopPropagation(); handleLeaderAction('BUY', '${leader.symbol}', ${leader.price}, ${leader.signal_buydip}, ${leader.rsi})">MUA</button>
+                    <button class="btn-sell-leader" onclick="event.stopPropagation(); handleLeaderAction('SELL', '${leader.symbol}', ${leader.price}, false, 0)">BÁN</button>
+                </div>
+            </div>
+        `;
+        grid.innerHTML += cardHtml;
+    });
+}
+
+async function toggleHistory() {
+    const select = document.getElementById('history-date-select');
+    const btn = document.getElementById('btn-show-history');
+    
+    if (select.style.display === 'none') {
+        // Show select, load dates
+        select.style.display = 'inline-block';
+        btn.innerText = '🔙 Hiện tại';
+        btn.style.borderColor = '#30363d';
+        btn.style.color = '#fff';
+        
+        const res = await fetch('/api/top_leaders_dates');
+        const dates = await res.json();
+        
+        select.innerHTML = '<option value="">Chọn ngày...</option>';
+        dates.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d;
+            opt.innerText = d;
+            select.appendChild(opt);
+        });
+    } else {
+        // Hide select, back to current
+        select.style.display = 'none';
+        btn.innerText = '🕒 Lịch sử';
+        btn.style.borderColor = '#f9c513';
+        btn.style.color = '#f9c513';
+        loadTopLeaders();
+    }
+}
+
+async function loadLeaderHistory() {
+    const date = document.getElementById('history-date-select').value;
+    if (!date) return;
+    
+    try {
+        const res = await fetch(`/api/top_leaders_history?date=${date}`);
+        const leaders = await res.json();
+        
+        if (leaders && !leaders.error) {
+            renderLeadersGrid(leaders);
+        } else {
+            alert('Không có dữ liệu cho ngày này.');
+        }
+    } catch (e) {
+        console.error("Load leader history error", e);
     }
 }
 

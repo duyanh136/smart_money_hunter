@@ -166,6 +166,7 @@
         <!-- Top 5 Leaders Dashboard -->
         <div class="top-leaders-container" id="top-leaders-container" style="display: none;">
             <div class="leaders-header">
+<<<<<<< HEAD
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                     <div>
                         <h2>🏆 BẢNG VÀNG: TOP 5 LÊN TÀU</h2>
@@ -173,6 +174,19 @@
                     </div>
                     <button class="btn-primary" onclick="exportTopLeaders()" 
                         style="background-color: #238636; border-color: #238636; width: auto; font-size: 13px;">📥 Xuất Top 10</button>
+=======
+                <h2>🏆 BẢNG VÀNG: TOP 5 LÊN TÀU</h2>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="leaders-subtitle">Máy quét Tự động - Cập nhật hàng ngày</span>
+                    <div id="history-controls" style="display: flex; align-items: center; gap: 5px; margin-left: 15px;">
+                        <button class="btn-filter" id="btn-show-history" onclick="toggleHistory()" 
+                                style="font-size: 0.8em; padding: 2px 8px; border-color: #f9c513; color: #f9c513;">🕒 Lịch sử</button>
+                        <select id="history-date-select" onchange="loadLeaderHistory()" 
+                                style="display: none; background: #0d1117; color: #fff; border: 1px solid #30363d; border-radius: 4px; padding: 2px 5px; font-size: 0.85em;">
+                            <option value="">Chọn ngày...</option>
+                        </select>
+                    </div>
+>>>>>>> f6a13dc14f50c2208f773e0888c875b1455c8fdf
                 </div>
             </div>
             <div class="leaders-grid" id="leaders-grid">
@@ -189,22 +203,30 @@
                             style="background: #333; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">--</span>
                     </div>
 
+                    <div id="badges-container" style="margin-top: 5px; display: flex; flex-wrap: wrap; gap: 5px;"></div>
+
                     <h1 id="current-price" style="margin: 10px 0;">--</h1>
 
                     <div id="volume-info" style="font-size: 0.9em; color: #8b949e; margin-bottom: 10px;">
                         Vol: <span id="current-vol" style="color: #f0f6fc; font-weight: bold;">--</span>
                     </div>
 
+                    <div style="margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                        <div style="font-size: 0.75rem; color: #8b949e; text-transform: uppercase;">Trạng thái MUA</div>
+                        <div id="buy-signal-status" style="font-size: 1.1rem; font-weight: bold; margin-top: 2px;">Đang quét...</div>
+                    </div>
+
                     <div class="strategy-box">
                         <div class="strategy-title">CHIẾN LƯỢC GỢI Ý</div>
-                        <div id="strategy-text" class="strategy-content">--</div>
+                        <div id="stock-strategy" class="strategy-content">--</div>
                     </div>
                 </div>
 
                 <div class="card phase-card" id="phase-card">
                     <h3>Giai đoạn cổ phiếu</h3>
-                    <p id="phase-value">N/A</p>
-                    <div id="action-value" style="margin-top: 5px; font-weight: bold; color: #4CAF50;">--</div>
+                    <p id="stock-phase">N/A</p>
+                    <div id="stock-action" style="margin-top: 5px; font-weight: bold; color: #4CAF50;">--</div>
+                    <div id="stock-base" style="font-size: 0.8em; color: #8b949e; margin-top: 5px;">--</div>
                 </div>
 
                 <div class="card signals-card">
@@ -297,6 +319,75 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}?v=1.3"></script>
+    <script>
+        // Set default date to today for the historical search
+        document.getElementById('leaders-history-date').valueAsDate = new Date();
+
+        async function fetchTopLeadersHistory() {
+            const dateStr = document.getElementById('leaders-history-date').value;
+            if (!dateStr) return;
+            
+            const grid = document.getElementById('leaders-grid');
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px;">Đang tải dữ liệu lịch sử...</div>';
+            
+            try {
+                const response = await fetch(`/api/top_leaders_history?date=${dateStr}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #ff6b6b;">Lỗi: ${data.error}</div>`;
+                    return;
+                }
+                
+                if (!data || data.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px;">Không có dữ liệu cho ngày này.</div>';
+                    return;
+                }
+                
+                grid.innerHTML = '';
+                data.forEach(leader => {
+                    const card = document.createElement('div');
+                    card.className = 'leader-card';
+                    card.onclick = () => {
+                        document.getElementById('symbol-input').value = leader.symbol;
+                        updateChart(leader.symbol);
+                    };
+                    
+                    const changeClass = leader.change >= 0 ? 'text-green' : 'text-red';
+                    const changeSign = leader.change >= 0 ? '+' : '';
+                    
+                    card.innerHTML = `
+                        <div class="leader-symbol">
+                            ${leader.symbol}
+                            <span class="leader-score">${Math.round(leader.score)}</span>
+                        </div>
+                        <div class="leader-tag">${leader.signals || ''}</div>
+                        <div class="leader-price-row">
+                            <span class="leader-price" style="color: #f9c513;">${leader.price.toLocaleString()}</span>
+                            <span class="leader-change ${changeClass}">${changeSign}${leader.change}%</span>
+                        </div>
+                        <div style="font-size: 0.6em; color: #8b949e; text-align: center; margin-top: 2px;">
+                            Top ${leader.rank}
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error fetching history:', error);
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px;">Lỗi kết nối Server.</div>';
+            }
+        }
+
+        // Helper function to bridge to main.js loadTopLeaders if needed
+        function loadTopLeaders() {
+            if (typeof window.fetchTopLeaders === 'function') {
+                window.fetchTopLeaders();
+            } else {
+                // Fallback or location-based reload
+                location.reload();
+            }
+        }
+    </script>
 </body>
 
 </html>
