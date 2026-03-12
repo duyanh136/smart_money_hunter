@@ -192,6 +192,48 @@ class SQLUtils:
             conn.close()
 
     @staticmethod
+    def get_analysis_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+        """Retrieves latest market analysis for a specific symbol."""
+        conn = SQLUtils.get_connection()
+        if not conn: return None
+        
+        p = SQLUtils._get_placeholder(conn)
+        sql = f"SELECT * FROM MarketAnalysis WHERE Symbol = {p}"
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(sql, (symbol.upper(),))
+            columns = [column[0] for column in cursor.description]
+            row = cursor.fetchone()
+            if row:
+                return dict(zip(columns, row))
+        except Exception as e:
+            logger.error(f"Error fetching analysis for {symbol}: {e}")
+        finally:
+            conn.close()
+        return None
+
+    @staticmethod
+    def get_all_market_analysis() -> List[Dict[str, Any]]:
+        """Retrieves all market analysis records from the database."""
+        conn = SQLUtils.get_connection()
+        if not conn: return []
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM MarketAnalysis")
+            columns = [column[0] for column in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+            return results
+        except Exception as e:
+            logger.error(f"Error fetching all market analysis: {e}")
+            return []
+        finally:
+            conn.close()
+
+    @staticmethod
     def save_market_analysis_to_history(analysis_data: List[Dict[str, Any]], date_str: str = None):
         """Saves a snapshot of market analysis to the history table."""
         conn = SQLUtils.get_connection()
