@@ -460,4 +460,4 @@ if __name__ == '__main__':
         logger.info("Client connected")
         emit('server_status', {'status': 'connected', 'tcbs_stream': tcbs_stream.running})
 
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
+    socketio.run(app, debug=False, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
