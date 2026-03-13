@@ -301,4 +301,15 @@ class MarketService:
         for i, res in enumerate(results):
             res['rank'] = i + 1
             
+        # --- SYNC TO SQL SERVER ---
+        from services.sql_utils import SQLUtils
+        try:
+            # First time? Run init
+            SQLUtils.init_analysis_tables()
+            # Then upsert results
+            SQLUtils.upsert_market_analysis(results)
+            logger.info(f"Market Analysis sync for {len(results)} symbols completed.")
+        except Exception as e:
+            logger.error(f"Failed to sync Market Analysis to DB: {e}")
+            
         return results[:limit]
