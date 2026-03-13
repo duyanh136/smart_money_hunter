@@ -213,6 +213,12 @@ def get_top_leaders():
         logger.error(f"API top_leaders error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/strategy_performance')
+def get_strategy_performance():
+    from services.performance_analyzer import StrategyPerformanceAnalyzer
+    stats = StrategyPerformanceAnalyzer.get_performance_stats()
+    return jsonify(stats)
+
 @app.route('/api/save_symbols', methods=['POST'])
 def save_symbols():
     try:
