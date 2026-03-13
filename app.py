@@ -248,6 +248,12 @@ def get_top_leaders_history():
 def get_top_leaders_dates():
     dates = DBService.get_available_dates()
     return jsonify(dates)
+@app.route('/api/strategy_performance')
+def get_strategy_performance():
+    from services.performance_analyzer import StrategyPerformanceAnalyzer
+    stats = StrategyPerformanceAnalyzer.get_performance_stats()
+    return jsonify(stats)
+
 @app.route('/api/save_symbols', methods=['POST'])
 def save_symbols():
     try:
