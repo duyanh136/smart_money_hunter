@@ -43,6 +43,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Save Symbols to DB
+    const btnSaveSymbols = document.getElementById('btnSaveSymbols');
+    if (btnSaveSymbols) {
+        btnSaveSymbols.addEventListener('click', async () => {
+            try {
+                btnSaveSymbols.disabled = true;
+                btnSaveSymbols.innerText = 'Đang lưu...';
+                
+                const res = await fetch('/api/save_symbols', { method: 'POST' });
+                const result = await res.json();
+                
+                if (result.status === 'success') {
+                    showToast('✅ Thành công', `Đã lưu ${result.count} mã vào Database.`, 'dip');
+                } else {
+                    showToast('❌ Lỗi', result.message || 'Không thể lưu mã.', 'fomo');
+                }
+            } catch (e) {
+                console.error("Save Symbols Error", e);
+                showToast('❌ Lỗi', 'Lỗi kết nối máy chủ.', 'fomo');
+            } finally {
+                btnSaveSymbols.disabled = false;
+                btnSaveSymbols.innerText = 'Lưu mã vào DB';
+            }
+        });
+    }
+
     // --- WebSocket Socket.IO ---
     socket.on('connect', () => {
         console.log("Connected to server");

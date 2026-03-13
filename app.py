@@ -248,6 +248,53 @@ def get_top_leaders_history():
 def get_top_leaders_dates():
     dates = DBService.get_available_dates()
     return jsonify(dates)
+@app.route('/api/save_symbols', methods=['POST'])
+def save_symbols():
+    try:
+        # Collect all unique symbols: WATCHLIST + Portfolio
+        portfolio = load_portfolio()
+        portfolio_symbols = [item['symbol'].strip().upper() for item in portfolio if item.get('symbol')]
+        all_symbols = list(set(WATCHLIST + portfolio_symbols))
+        
+        # SQL Connection
+        import pyodbc
+        conn_str = (
+            f"DRIVER={os.getenv('SQL_DRIVER', '{ODBC Driver 17 for SQL Server}')};"
+            f"SERVER={os.getenv('SQL_SERVER')};"
+            f"DATABASE={os.getenv('SQL_DATABASE')};"
+            f"UID={os.getenv('SQL_USER')};"
+            f"PWD={os.getenv('SQL_PASSWORD')};"
+            "TrustServerCertificate=yes;"
+        )
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+        
+        # Create table if not exists
+        sql_create = """
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='StockSymbols' AND xtype='U')
+        CREATE TABLE StockSymbols (
+            Symbol VARCHAR(20) PRIMARY KEY,
+            CreatedAt DATETIME DEFAULT GETDATE()
+        )
+        """
+        cursor.execute(sql_create)
+        
+        # Insert/Upsert symbols
+        # Using a simple check for existence for basic SQL Server compatibility
+        for sym in all_symbols:
+            cursor.execute("""
+                IF NOT EXISTS (SELECT 1 FROM StockSymbols WHERE Symbol = ?)
+                INSERT INTO StockSymbols (Symbol) VALUES (?)
+            """, sym, sym)
+            
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Successfully saved {len(all_symbols)} symbols to database.")
+        return jsonify({"status": "success", "count": len(all_symbols)})
+    except Exception as e:
+        logger.error(f"Error saving symbols to DB: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # Global Watchlist
 WATCHLIST = [
