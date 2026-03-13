@@ -579,8 +579,31 @@ if __name__ == '__main__':
                 tcbs_stream.subscribe(combined_watchlist)
             except Exception as e:
                 logger.error(f"Failed to start TCBS Stream: {e}")
+        # Start Market Analysis Sync (Every 30 mins)
+        def run_analysis_sync():
+            from services.market_service import MarketService
+            from services.sql_utils import SQLUtils
+            logger.info("Starting Market Analysis Sync background task...")
+            SQLUtils.init_analysis_tables()
+            while True:
+                try:
+                    # This will trigger analysis and upsert to DB
+                    MarketService.get_top_leaders(limit=10)
+                    logger.info("Periodic Market Analysis sync successful.")
+                except Exception as e:
+                    logger.error(f"Error in background Market Analysis sync: {e}")
+                time.sleep(1800) # 30 minutes
+        
+        analysis_thread = threading.Thread(target=run_analysis_sync, daemon=True)
+        analysis_thread.start()
     else:
         logger.info("Vercel Mode: Background threads disabled. Using SQL Sync fallback.")
+        # On Vercel, we can't run background threads, 
+        # but we can initialize tables if needed (though usually done via migrations)
+        from services.sql_utils import SQLUtils
+        try:
+            SQLUtils.init_analysis_tables()
+        except: pass
 
     @socketio.on('connect')
     def handle_connect():
