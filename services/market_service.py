@@ -444,3 +444,15 @@ class MarketService:
             logger.info(f"Saved full market analysis & history for {today}")
         
         return results
+        # --- SYNC TO SQL SERVER ---
+        from services.sql_utils import SQLUtils
+        try:
+            # First time? Run init
+            SQLUtils.init_analysis_tables()
+            # Then upsert results
+            SQLUtils.upsert_market_analysis(results)
+            logger.info(f"Market Analysis sync for {len(results)} symbols completed.")
+        except Exception as e:
+            logger.error(f"Failed to sync Market Analysis to DB: {e}")
+            
+        return results[:limit]
