@@ -986,6 +986,100 @@ async function exportTopLeaders() {
     }
 }
 
+// --- BACKTEST PERFORMANCE DASHBOARD ---
+let equityChartInstance = null;
+
+window.openBacktestModal = async function() {
+    const modal = document.getElementById('backtest-modal');
+    modal.style.display = 'flex';
+    
+    showToast('🚀 Đang tính toán hiệu quả chiến thuật...', 'info');
+    
+    try {
+        const response = await fetch('/api/strategy_performance');
+        const data = await response.json();
+        
+        if (data.error) {
+            showToast(data.error, 'error');
+            return;
+        }
+        
+        const summary = data.summary;
+        
+        // Populate Stats
+        document.getElementById('bt-win-rate').innerText = summary.win_rate_t10 + '%';
+        document.getElementById('bt-avg-ret').innerText = (summary.avg_return_t10 > 0 ? '+' : '') + summary.avg_return_t10 + '%';
+        document.getElementById('bt-total-days').innerText = summary.total_days_analyzed;
+        
+        // Recommendation Logic
+        let recommendation = '';
+        if (summary.avg_return_t10 > 2) {
+            recommendation = `🔥 <b>CHIẾN THUẬT SIÊU VIỆT:</b> Top 10 mang lại lợi nhuận trung bình <b>${summary.avg_return_t10}%</b> sau mỗi 10 ngày. Xác suất thắng <b>${summary.win_rate_t10}%</b> là cực kỳ ấn tượng. Khuyến nghị: Ưu tiên giải ngân tỷ trọng cao vào các mã đứng đầu danh sách.`;
+        } else if (summary.avg_return_t10 > 0) {
+            recommendation = `✅ <b>HIỆU QUẢ ỔN ĐỊNH:</b> Chiến thuật đang mang lại lợi nhuận dương. Thời gian nắm giữ tối ưu thường rơi vào khoảng <b>10-15 ngày (T+10 đến T+15)</b>. Hãy kiên nhẫn nắm giữ để dòng tiền lan tỏa.`;
+        } else {
+            recommendation = `⚠️ <b>RỦI RO THỊ TRƯỜNG:</b> Hiện tại hiệu suất Top 10 đang đi ngang hoặc sụt giảm do thị trường chung xấu. Hãy hạ tỷ trọng và chỉ tham gia với khối lượng nhỏ cho đến khi đường cong lợi nhuận hướng lên.`;
+        }
+        document.getElementById('bt-recommendation').innerHTML = recommendation;
+        
+        // Render Chart
+        renderEquityChart(summary.equity_curve);
+        
+    } catch (error) {
+        console.error('Backtest Error:', error);
+        showToast('Lỗi khi tải dữ liệu backtest', 'error');
+    }
+}
+
+function renderEquityChart(curve) {
+    const ctx = document.getElementById('equity-chart').getContext('2d');
+    
+    if (equityChartInstance) {
+        equityChartInstance.destroy();
+    }
+    
+    const labels = curve.map(point => point.date);
+    const data = curve.map(point => point.profit);
+    
+    equityChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Lợi nhuận lũy kế (% Sum T+10)',
+                data: data,
+                borderColor: '#9c27b0',
+                backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 3,
+                pointBackgroundColor: '#9c27b0'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#8b949e', font: { size: 10 } }
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                    ticks: { 
+                        color: '#8b949e',
+                        callback: function(value) { return value + '%'; }
+                    }
+                }
+            }
+        }
+    });
+}
+
 // Initial render for Stop Loss Table when opening or loading
 document.addEventListener('DOMContentLoaded', () => {
     renderStopLossTable();
