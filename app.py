@@ -254,6 +254,15 @@ def get_strategy_performance():
     stats = StrategyPerformanceAnalyzer.get_performance_stats()
     return jsonify(stats)
 
+@app.route('/api/debug_seed')
+def debug_seed():
+    try:
+        from seed_test_data import seed_history
+        seed_history()
+        return jsonify({"status": "success", "message": "Dummy data seeded successfully."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 @app.route('/api/save_symbols', methods=['POST'])
 def save_symbols():
     try:
