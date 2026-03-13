@@ -21,10 +21,16 @@ class StrategyPerformanceAnalyzer:
             return {"error": "Database connection failed"}
 
         try:
+            with open('backtest_debug.log', 'a') as f:
+                f.write(f"[{datetime.now()}] Starting performance stats calculation...\n")
+            
             # 1. Load entire history into a DataFrame for efficient processing
             query = "SELECT Symbol, AnalysisDate, Price, Score FROM MarketAnalysisHistory ORDER BY AnalysisDate DESC"
             df = pd.read_sql(query, conn)
             conn.close()
+
+            with open('backtest_debug.log', 'a') as f:
+                f.write(f"[{datetime.now()}] Found {len(df)} rows in history.\n")
 
             if df.empty:
                 return {"error": "No historical data found. Please run some scans first."}
