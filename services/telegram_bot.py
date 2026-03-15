@@ -97,14 +97,14 @@ def check_realtime_stoploss(symbol: str, current_price: float):
             return
             
         is_default_sl = cache_item.get('current_sl') == cache_item.get('cost', 0) * 0.9
-        sl_type = "Má»c quáº£n trá» 10% (Tá»± Äá»ng)" if is_default_sl else "Má»c ná»n há» trá»£"
+        sl_type = "Mốc quản trị 10% (Tự động)" if is_default_sl else "Mốc nền hỗ trợ"
         
         emergency_msg = (
-            f"ð¨ <b>Cáº¢NH BÃO KHáº¨N Cáº¤P: VI PHáº M Rá»¦I RO!</b> ð¨\n\n"
-            f"ð MÃ£ CK: <b>{symbol}</b>\n"
-            f"â ï¸ GiÃ¡ hiá»n táº¡i: <b>{current_price:,.2f}</b> ÄÃ£ rá»t dÆ°á»i {sl_type}: <b>{cache_item['current_sl']:,.2f}</b>!\n"
-            f"ð©¸ Tráº¡ng thÃ¡i: NgÆ°á»¡ng chá»u Äá»±ng tá»i Äa ÄÃ£ bá» phÃ¡ vá»¡.\n\n"
-            f"â¡ï¸ <b>HÃNH Äá»NG Báº®T BUá»C:</b> SÃT Dá»¨T KHOÃT Äá» báº£o vá» NAV ngay láº­p tá»©c!"
+            f"🚨 <b>CẢNH BÁO KHẨN CẤP: VI PHẠM RỦI RO!</b> 🚨\n\n"
+            f"📉 Mã CK: <b>{symbol}</b>\n"
+            f"⚠️ Giá hiện tại: <b>{current_price:,.2f}</b> đã rớt dưới {sl_type}: <b>{cache_item['current_sl']:,.2f}</b>!\n"
+            f"🩸 Trạng thái: Ngưỡng chịu đựng tối đa đã bị phá vỡ.\n\n"
+            f"⚡️ <b>HÀNH ĐỘNG BẮT BUỘC:</b> SÚT DỨT KHOÁT để bảo vệ NAV ngay lập tức!"
         )
         
         # 5. Send to Telegram
@@ -132,7 +132,7 @@ def send_system_alert(message: str):
         logger.warning(f"System Alert (Dry Run): {message}")
         return
 
-    formatted_msg = f"ð  <b>Há» THá»NG THÃNG BÃO</b>\n\n{message}"
+    formatted_msg = f"🛠 <b>HỆ THỐNG THÔNG BÁO</b>\n\n{message}"
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -186,17 +186,11 @@ def check_portfolio_and_send_alert():
     now = datetime.now()
     
     # Check if a new day has started to reset the alert_sent flag
-    # If it's a new day, we want to allow alerts again if price is still bad. Wait, 
-    # usually we might reset overnight. For simplicity, the 30-min job can 
-    # reset alert_sent if the price recovers above the SL, or we reset it at midnight.
-    # Let's rebuild the cache here on the scheduled run to ensure it's synced.
     
     # Check if inside trading hours (Mon-Fri, 09:00 - 15:00)
-    # Allows a little buffer
     if now.weekday() >= 5: # Saturday or Sunday
         logger.info("Weekend. Skipping check.")
-        # return # Comment out return for testing if needed
-        pass
+        return
     
     hour = now.hour
     minute = now.minute
@@ -204,8 +198,7 @@ def check_portfolio_and_send_alert():
     
     if time_val < 900 or time_val > 1500:
         logger.info("Outside trading hours (09:00-15:00). Skipping check.")
-        # return # Comment out return for testing if needed
-        pass
+        return
 
     messages = []
     total_pnl_vnd = 0
@@ -238,7 +231,7 @@ def check_portfolio_and_send_alert():
         last_row = df.iloc[-1]
         raw_close = last_row.get('Close', 0)
         
-        # Normalize to thousands (e.g. 61900 -> 61.9)
+        # Normalize to thousands
         close_price = raw_close / 1000 if raw_close > 1000 else raw_close
         cost_k = cost / 1000 if cost > 1000 else cost
         sl_k = current_sl / 1000 if current_sl > 1000 else current_sl
@@ -251,14 +244,13 @@ def check_portfolio_and_send_alert():
         signal_chammay = last_row.get('Signal_ChamMayKenhDuoi', False)
         signal_panicsell = last_row.get('Signal_PanicSell', False)
 
-        # Update cache values for realtime monitoring (SL is left as user input base)
-        # Cooldown management: if price recovered ABOVE the sl, reset alert_sent
+        # Cooldown management
         if close_price > sl_k and alert_sent:
             alert_sent = False
             item['alert_sent'] = False
             logger.info(f"{symbol} recovered above SL. Resetting alert_sent flag.")
             
-        # Update global cache with latest SL and alert flag state
+        # Update global cache
         portfolio_cache[symbol] = {
             'current_sl': current_sl,
             'alert_sent': alert_sent
@@ -267,61 +259,61 @@ def check_portfolio_and_send_alert():
         updated_portfolio.append(item)
         
         # PnL calculations
-        pnl_vnd = (close_price - cost_k) * volume * 1000 # Assuming price is in '000 VND
+        pnl_vnd = (close_price - cost_k) * volume * 1000 
         pnl_percent = ((close_price - cost_k) / cost_k) * 100 if cost_k > 0 else 0
         total_pnl_vnd += pnl_vnd
         
         # ACTION & RADAR LOGIC
         if signal_panicsell:
-            radar_alert = "ð¨ <b>PANIC SELL (THIÃN NGA ÄEN):</b> Hiá»n tÆ°á»£ng bÃ¡n thÃ¡o hoáº£ng loáº¡n, rá»t giÃ¡ tháº£m khá»c kÃ¨m Vol lá»n. SÃºt ngay láº­p tá»©c Äá» báº£o vá» vá»n!"
-            action = "BÃN THÃO (Cáº£nh BÃ¡o Sáº­p) ð´"
+            radar_alert = "🚨 <b>PANIC SELL (THIÊN NGA ĐEN):</b> Hiện tượng bán tháo hoảng loạn, rớt giá thảm khốc kèm Vol lớn. Sút ngay lập tức để bảo vệ vốn!"
+            action = "BÁN THÁO (Cảnh Báo Sập) 🔴"
         elif pnl_percent <= -10:
-            radar_alert = "ð <b>VI PHáº M Náº¶NG (-10%):</b> GiÃ¡ ÄÃ£ xuyÃªn thá»§ng ngÆ°á»¡ng chá»u Äá»±ng tá»i Äa. Cáº¯t lá» toÃ n bá» Äá» báº£o vá» vá»n ngay láº­p tá»©c!"
-            action = "BÃN Háº¾T - Cáº®T Lá» ð´"
+            radar_alert = "💀 <b>VI PHẠM NẶNG (-10%):</b> Giá đã xuyên thủng ngưỡng chịu đựng tối đa. Cắt lỗ toàn bộ để bảo vệ vốn ngay lập tức!"
+            action = "BÁN HẾT - CẮT LỖ 🔴"
         elif pnl_percent <= -7:
-            radar_alert = "âï¸ <b>QUáº¢N TRá» Rá»¦I RO (-7%):</b> Khoáº£n lá» ÄÃ£ cháº¡m ngÆ°á»¡ng cáº£nh bÃ¡o. HÃ£y bÃ¡n Ã­t nháº¥t 1/2 vá» tháº¿ Äá» háº¡ tá»· trá»ng, ÄÆ°a tÃ i khoáº£n vá» tháº¿ an toÃ n!"
-            action = "Cáº®T 1/2 - Háº  Tá»¶ TRá»NG ð´"
+            radar_alert = "✂️ <b>QUẢN TRỊ RỦI RO (-7%):</b> Khoản lỗ đã chạm ngưỡng cảnh báo. Hãy bán ít nhất 1/2 vị thế để hạ tỷ trọng, đưa tài khoản về thế an toàn!"
+            action = "CẮT 1/2 - HẠ TỶ TRỌNG 🔴"
         elif signal_phankyam:
-            radar_alert = "ð <b>Cáº¢NH BÃO Táº O Äá»NH:</b> MACD ÄÃ£ xuáº¥t hiá»n phÃ¢n ká»³ Ã¢m 2/3 Äoáº¡n. Äá»ng lá»±c tÄng ÄÃ£ cáº¡n. Chá»t lá»i vÃ  thoÃ¡t toÃ n bá» hÃ ng!"
-            action = "BÃN TOÃN Bá» ð´"
+            radar_alert = "🛑 <b>CẢNH BÁO TẠO ĐỈNH:</b> MACD đã xuất hiện phân kỳ âm 2/3 đoạn. Động lực tăng đã cạn. Chốt lời và thoát toàn bộ hàng!"
+            action = "BÁN TOÀN BỘ 🔴"
         elif signal_daodong:
-            radar_alert = "â ï¸ <b>Rá»¦I RO NGá»°A Háº N:</b> GiÃ¡ dao Äá»ng lá»ng láº»o, kÃ©o xáº£ biÃªn Äá» lá»n. ÄÃ¢y lÃ  vÃ¹ng Äá»nh ngáº¯n háº¡n, chá»§ Äá»ng chá»t lá»i báº£o vá» thÃ nh quáº£!"
-            action = "CHá»T Lá»I NGáº®N Háº N ð´"
+            radar_alert = "⚠️ <b>RỦI RO NGỰA HẠN:</b> Giá dao động lỏng lẻo, kéo xả biên độ lớn. Đây là vùng đỉnh ngắn hạn, chủ động chốt lời bảo vệ thành quả!"
+            action = "CHỐT LỜI NGẮN HẠN 🔴"
         elif signal_sangtay:
-            radar_alert = "ð¨ <b>BÃO Äá»NG:</b> LÃ¡i Äang sang tay hÃ ng cho nhá» láº». DÃ²ng tiá»n thÃ´ng minh rÃºt ra. CÃ¢n nháº¯c chá»t lá»i ngay!"
-            action = "CÃN NHáº®C CHá»T Lá»I ð´"
+            radar_alert = "🚨 <b>BÁO ĐỘNG:</b> Lái đang sang tay hàng cho nhỏ lẻ. Dòng tiền thông minh rút ra. Cân nhắc chốt lời ngay!"
+            action = "CÂN NHẮC CHỐT LỜI 🔴"
         elif signal_gaynen:
-            radar_alert = "â <b>BULL-TRAP:</b> Cá» phiáº¿u gÃ£y ná»n Äang test láº¡i há»i phá»¥c ká»¹ thuáº­t. KHÃNG mua trung bÃ¬nh giÃ¡. Canh sÃºt ngay láº­p tá»©c!"
-            action = "SÃT Dá»¨T KHOÃT ð´"
+            radar_alert = "❌ <b>BULL-TRAP:</b> Cổ phiếu gãy nền đang test lại hồi phục kỹ thuật. KHÔNG mua trung bình giá. Canh sút ngay lập tức!"
+            action = "SÚT DỨT KHOÁT 🔴"
         elif signal_chammay:
-            radar_alert = "âï¸ <b>KHÃNG Cá»° MÃY:</b> HÃ ng kÃªnh dÆ°á»i cháº¡m biÃªn trÃªn khÃ¡ng cá»±. MÃ¢y cÃ²n dÃ y cá»p khÃ´ng thá» cÃ³ Uptrend. BÃ¡n ngay Äá» xoay vÃ²ng vá»n!"
-            action = "CÆ  Cáº¤U XOAY VÃNG ð´"
+            radar_alert = "☁️ <b>KHÁNG CỰ MÂY:</b> Hàng kênh dưới chạm biên trên kháng cự. Mây còn dày cộp không thể có Uptrend. Bán ngay để xoay vòng vốn!"
+            action = "CƠ CẤU XOAY VÒNG 🔴"
         else:
             radar_alert = ""
             if pnl_percent >= 0:
-                action = "Gá»ng LÃ£i an toÃ n ð¢"
+                action = "Gồng Lãi an toàn 🟢"
             else:
-                action = "Theo dÃµi / Quáº£n trá» ð¡"
+                action = "Theo dõi / Quản trị 🟡"
             
-        # Chá»t lá»i hÃ¬nh thÃ¡p (Scale-out logic)
+        # Chốt lời hình tháp
         if pnl_percent > 50:
-            radar_alert += f"\nðº <i>Nháº¯c nhá» HÃ¬nh ThÃ¡p:</i> ÄÃ£ siÃªu lá»£i nhuáº­n > 50%. CÃ ng lÃªn cao tá»· trá»ng cÃ ng pháº£i giáº£m. BÃ¡n chá»t lá»i tá»«ng pháº§n!"
+            radar_alert += f"\n🔺 <i>Nhắc nhở Hình Tháp:</i> Đã siêu lợi nhuận > 50%. Càng lên cao tỷ trọng càng phải giảm. Bán chốt lời từng phần!"
         elif pnl_percent > 30:
-            radar_alert += f"\nðº <i>Nháº¯c nhá» HÃ¬nh ThÃ¡p:</i> ÄÃ£ lÃ£i > 30%. HÃ£y ÄÆ°a bá»t tiá»n vá» tÃºi theo ÄÃ  tÄng kÃ©o thá»c."
+            radar_alert += f"\n🔺 <i>Nhắc nhở Hình Tháp:</i> Đã lãi > 30%. Hãy đưa bớt tiền về túi theo đà tăng kéo thốc."
             
         # Format message snippet
-        emoji_pnl = "ð¢" if pnl_vnd >= 0 else "ð´"
+        emoji_pnl = "🟢" if pnl_vnd >= 0 else "🔴"
         sign_pnl = "+" if pnl_vnd >= 0 else ""
         
         msg_snip = (
-            f"ð  <b>MÃ£ CK: {symbol}</b> | Khá»i lÆ°á»£ng: {int(volume):,}\n"
-            f"GiÃ¡ hiá»n táº¡i: <b>{close_price:,.2f}</b> (Vá»n: {cost_k:,.2f})\n"
-            f"ð Lá»£i nhuáº­n: {emoji_pnl} {sign_pnl}{pnl_vnd:,.0f} VNÄ ({sign_pnl}{pnl_percent:.2f}%)\n"
+            f"💠 <b>Mã CK: {symbol}</b> | Khối lượng: {int(volume):,}\n"
+            f"Giá hiện tại: <b>{close_price:,.2f}</b> (Vốn: {cost_k:,.2f})\n"
+            f"📊 Lợi nhuận: {emoji_pnl} {sign_pnl}{pnl_vnd:,.0f} VNĐ ({sign_pnl}{pnl_percent:.2f}%)\n"
         )
         
         if radar_alert:
-            msg_snip += f"ð¡ <b>SMART SELL RADAR:</b>\n{radar_alert}\n"
-            msg_snip += f"â¡ï¸ HÃ nh Äá»ng: <b>{action}</b>"
+            msg_snip += f"📡 <b>SMART SELL RADAR:</b>\n{radar_alert}\n"
+            msg_snip += f"⚡️ Hành động: <b>{action}</b>"
             messages.append(msg_snip)
             
     save_portfolio(updated_portfolio)
@@ -333,15 +325,35 @@ def check_portfolio_and_send_alert():
     sign_total = "+" if total_pnl_vnd >= 0 else ""
     # Construct final message
     final_message = (
-        f"TING! App Smart Money Hunter bÃ¡o:\n"
-        f"â± <b>BÃO CÃO DANH Má»¤C & ÄIá»M BÃN</b>\n"
-        f"<i>Cáº­p nháº­t: {now.strftime('%H:%M %d/%m/%Y')}</i>\n\n" +
+        f"TING! App Smart Money Hunter báo:\n"
+        f"⏱ <b>BÁO CÁO DANH MỤC & ĐIỂM BÁN</b>\n"
+        f"<i>Cập nhật: {now.strftime('%H:%M %d/%m/%Y')}</i>\n\n" +
         "\n\n".join(messages) +
-        f"\n\nð° <b>Tá»NG Lá»¢I NHUáº¬N Táº M TÃNH: {sign_total}{total_pnl_vnd:,.0f} VNÄ</b>"
+        f"\n\n💰 <b>TỔNG LỢI NHUẬN TẠM TÍNH: {sign_total}{total_pnl_vnd:,.0f} VNĐ</b>"
     )
     
     # Send via Telegram API
-    if not bdef auto_save_daily_leaders():
+    if not bot_token or not chat_id:
+        logger.info(f"DRY RUN - WOULD SEND THE FOLLOWING TO TELEGRAM:\n{final_message}")
+        return
+        
+    telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": final_message,
+        "parse_mode": "HTML"
+    }
+    
+    try:
+        resp = requests.post(telegram_url, json=payload)
+        if resp.status_code != 200:
+            logger.error(f"Failed to send Telegram message: {resp.text}")
+        else:
+            logger.info("Telegram alert sent successfully.")
+    except Exception as e:
+        logger.error(f"Error sending Telegram message: {e}")
+
+def auto_save_daily_leaders():
     """Fetches Top 10 leaders and saves them to SQL History at 16:00 every day."""
     logger.info("Executing daily 16:00 Market Analysis History Backup...")
     try:
@@ -367,28 +379,28 @@ def check_portfolio_and_send_alert():
             if leaders:
                 leader_lines = []
                 for l in leaders:
-                    shark = "ð" if l.get('is_shark_dominated') else ""
-                    storm = "ð¡ï¸" if l.get('is_storm_resistant') else ""
+                    shark = "💎" if l.get('is_shark_dominated') else ""
+                    storm = "🛡️" if l.get('is_storm_resistant') else ""
                     line = f"#{l['rank']} <b>{l['symbol']}</b> (P: {l['price']:.1f}, {l['change']:+.1f}%) {shark}{storm}"
                     leader_lines.append(line)
                 
                 leader_list_str = "\n".join(leader_lines)
                 msg = (
-                    f"ð <b>BÃO CÃO Káº¾T PHIÃN {datetime.now().strftime('%d/%m/%Y')}</b>\n\n"
-                    f"â ÄÃ£ lÆ°u trá»¯ dá»¯ liá»u phÃ¢n tÃ­ch cá»§a {len(results)} mÃ£ vÃ o SQL Server.\n\n"
-                    f"ð <b>TOP 10 Cá» PHIáº¾U Máº NH NHáº¤T:</b>\n"
+                    f"📊 <b>BÁO CÁO KẾT PHIÊN {datetime.now().strftime('%d/%m/%Y')}</b>\n\n"
+                    f"✅ Đã lưu trữ dữ liệu phân tích của {len(results)} mã vào SQL Server.\n\n"
+                    f"🏆 <b>TOP 10 CỔ PHIẾU MẠNH NHẤT:</b>\n"
                     f"{leader_list_str}\n\n"
-                    f"<i>Sau nÃ y báº¡n cÃ³ thá» truy váº¥n báº£ng MarketAnalysisHistory Äá» xem láº¡i.</i>"
+                    f"<i>Sau này bạn có thể truy vấn bảng MarketAnalysisHistory để xem lại.</i>"
                 )
             else:
-                msg = f"ð <b>BÃO CÃO Káº¾T PHIÃN {datetime.now().strftime('%d/%m/%Y')}</b>\n\nâ ÄÃ£ hoÃ n thÃ nh sao lÆ°u dá»¯ liá»u toÃ n thá» trÆ°á»ng vÃ o SQL Server."
+                msg = f"📊 <b>BÁO CÁO KẾT PHIÊN {datetime.now().strftime('%d/%m/%Y')}</b>\n\n✅ Đã hoàn thành sao lưu dữ liệu toàn thị trường vào SQL Server."
                 
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
             requests.post(url, json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML"}, timeout=10)
             
     except Exception as e:
         logger.error(f"Error in auto_save_daily_leaders: {e}")
-        send_system_alert(f"Lá»i khi lÆ°u dá»¯ liá»u lá»ch sá»­ lÃºc 16:00: {e}")
+        send_system_alert(f"Lỗi khi lưu dữ liệu lịch sử lúc 16:00: {e}")
 
 def send_top10_alert():
     """Fetches top 10 leaders and sends an alert to Telegram"""
@@ -400,7 +412,7 @@ def send_top10_alert():
     if not bot_token or not chat_id:
         logger.warning("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set. Skipping Top 10 Alert.")
         return
-    
+
     try:
         leaders = MarketService.get_top_leaders(limit=10)
         if not leaders:
@@ -411,8 +423,8 @@ def send_top10_alert():
         
         # Format message
         header = (
-            f"ð <b>DANH SÃCH TOP 10 SIÃU Cá» PHIáº¾U</b> ð\n"
-            f"<i>Cáº­p nháº­t: {now.strftime('%H:%M %d/%m/%Y')}</i>\n\n"
+            f"🏆 <b>DANH SÁCH TOP 10 SIÊU CỔ PHIẾU</b> 🏆\n"
+            f"<i>Cập nhật: {now.strftime('%H:%M %d/%m/%Y')}</i>\n\n"
         )
         
         leader_msgs = []
@@ -423,38 +435,18 @@ def send_top10_alert():
             change = res['change']
             tag = res.get('tag', '')
             
-            emoji = "ð¢" if change >= 0 else "ð´"
+            emoji = "🟢" if change >= 0 else "🔴"
             sign = "+" if change >= 0 else ""
             
             # Rank and Score
             msg = (
                 f"{i+1}. <b>{symbol}</b> ({tag})\n"
-                f"   ð° GiÃ¡: <b>{price:,.1f}</b> ({emoji} {sign}{change}%)\n"
-                f"   ð Leader Score: <b>{score:.1f}</b>"
+                f"   💰 Giá: <b>{price:,.1f}</b> ({emoji} {sign}{change}%)\n"
+                f"   🚀 Leader Score: <b>{score:.1f}</b>"
             )
             leader_msgs.append(msg)
             
-        footer = "\n\nð¡ <i>Há» thá»ng tá»± Äá»ng lá»c theo Leader Score (DÃ²ng tiá»n + Sá»©c máº¡nh giÃ¡).</i>"
-        
-        final_message = header + "\n\n".join(leader_msgs) + footer
-        
-        # Send via Telegram API
-        telegram_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": final_message,
-            "parse_mode": "HTML"
-        }
-        
-        resp = requests.post(telegram_url, json=payload, timeout=10)
-        if resp.status_code == 200:
-            logger.info("Top 10 Telegram alert sent successfully.")
-        else:
-            logger.error(f"Failed to send Top 10 alert: {resp.text}")
-            
-    except Exception as e:
-        logger.error(f"Error in send_top10_alert: {e}")
-» thá»ng tá»± Äá»ng lá»c theo Leader Score (DÃ²ng tiá»n + Sá»©c máº¡nh giÃ¡).</i>"
+        footer = "\n\n💡 <i>Hệ thống tự động lọc theo Leader Score (Dòng tiền + Sức mạnh giá).</i>"
         
         final_message = header + "\n\n".join(leader_msgs) + footer
         
@@ -483,36 +475,30 @@ def run_bot_scheduler():
     schedule.every(30).minutes.do(check_portfolio_and_send_alert)
     schedule.every(30).minutes.do(send_top10_alert)
     
-    # Daily scan at 16:00 (After Market Close)
-    # Job 1: Daily scan at 16:00 (Saves to SQL Server AND SQLite)
+    # Daily scan at 16:00
     schedule.every().day.at("16:00").do(auto_save_daily_leaders)
     
-    # Job 2: Hourly scan during trading session (9:00 - 15:00)
-    # This ensures the cache is fresh for daytime users
+    # Hourly scan during trading session
     def hourly_trading_scan():
         now = datetime.now()
-        # Mon-Fri, 9am-4pm
         if now.weekday() < 5 and 9 <= now.hour <= 16:
             logger.info("Scheduled Hourly Trading Scan triggered...")
             MarketService.run_full_market_scan()
             
     schedule.every().hour.at(":05").do(hourly_trading_scan)
     
-    # Job 3: One-time scan at startup to warm up the cache
+    # Startup warmup
     def startup_warmup():
         logger.info("Startup cache warmup triggered...")
         MarketService.run_full_market_scan()
     
-    # Run startup warmup in a separate thread to not block the main loop
     threading.Thread(target=startup_warmup, daemon=True).start()
 
-    logger.info("Telegram Bot Scheduler started. Jobs scheduled: 16:00 Daily + Hourly Trading.")
+    logger.info("Telegram Bot Scheduler started.")
     while True:
         schedule.run_pending()
         time.sleep(60)
 
 if __name__ == "__main__":
-    # Test run
     logging.basicConfig(level=logging.INFO)
-    logger.info("Running manual check...")
     check_portfolio_and_send_alert()
